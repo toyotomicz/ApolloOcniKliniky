@@ -1,0 +1,82 @@
+# ApolloData – local stack.  Start with:  docker compose up --build
+# Configuration comes from .env (copy .env.example or run scripts/init-env.ps1).
+name: apollodata
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-apollodata}
+      POSTGRES_USER: ${POSTGRES_USER:-apollo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+    # No published port: the database is reachable only from the api container.
+    # For local development without Docker for the API, use docker-compose.dev.yml.
+
+  api:
+    build: ./backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-apollodata};Username=${POSTGRES_USER:-apollo};Password=${POSTGRES_PASSWORD}"
+      APP_NAME: ${APP_NAME:-ApolloData}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-ApolloData}
+      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-true}
+      OTP_HASH_KEY: ${OTP_HASH_KEY:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      REPORTING_TIME_ZONE: ${REPORTING_TIME_ZONE:-Europe/Prague}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
+      # Requests reach the API only through the web (Nginx) container.
+      TRUST_FORWARDED_HEADERS: "true"
+    volumes:
+      - api-keys:/data/keys
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [backend, frontend]
+
+  web:
+    build: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [frontend]
+
+  # Local email catcher – start with:  docker compose --profile mailpit up --build
+  # (or set COMPOSE_PROFILES=mailpit in .env). Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.31
+    profiles: [mailpit]
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    restart: unless-stopped
+    networks: [backend]
+
+volumes:
+  db-data:
+  api-keys:
+
+networks:
+  backend:
+  frontend:

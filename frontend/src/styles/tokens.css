@@ -1,0 +1,63 @@
+/*
+ * Design tokens, aligned with apollodata.cz: dark charcoal header/footer (#313336), red accent (#c93a32),
+ * Open Sans for text and page titles, Saira for section headings and buttons, Nunito for navigation and footer.
+ * Change branding colours here.
+ */
+:root {
+  --font-body: 'Open Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-display: 'Saira', 'Open Sans', system-ui, sans-serif;
+  --font-nav: 'Nunito', 'Open Sans', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --color-ink: #212529;
+  --color-ink-strong: #14171a;
+  --color-slate: #465051;
+  --color-chrome: #313336;
+  --color-chrome-text: #d3d3d3;
+  --color-muted: #5b6570;
+  --color-subtle: #8a939c;
+
+  --color-bg: #f5f6f7;
+  --color-surface: #ffffff;
+  --color-surface-alt: #fafbfb;
+  --color-border: #e2e5e8;
+  --color-border-strong: #cfd4d9;
+
+  --color-accent: #c93a32;
+  --color-accent-hover: #a8302a;
+  --color-accent-soft: #fbeeed;
+  --color-accent-ink: #8f2620;
+
+  --color-success: #1d7348;
+  --color-success-soft: #e7f4ed;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #fdf4e1;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --color-info: #2b5c8a;
+  --color-info-soft: #e9f1f8;
+
+  --focus-ring: 0 0 0 3px rgba(201, 58, 50, 0.35);
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(20, 23, 26, 0.06);
+  --shadow: 0 1px 3px rgba(20, 23, 26, 0.08), 0 4px 12px rgba(20, 23, 26, 0.04);
+  --shadow-lg: 0 12px 32px rgba(20, 23, 26, 0.12);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  --container: 1160px;
+  --header-height: 66px;
+}

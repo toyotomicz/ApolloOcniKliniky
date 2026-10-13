@@ -1,0 +1,636 @@
+/* ---------- Brand ---------- */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--color-ink-strong);
+}
+.brand:hover {
+  color: var(--color-ink-strong);
+}
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+.brand-sub {
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.brand-inverse,
+.brand-inverse:hover {
+  color: #fff;
+}
+.brand-inverse .brand-sub {
+  color: rgba(255, 255, 255, 0.6);
+}
+/* On the dark bar the mark drops its own dark tile. */
+.brand-inverse .brand-mark-bg {
+  fill: transparent;
+}
+
+/* ---------- Public header (dark bar as on apollodata.cz) ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-chrome);
+}
+.site-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: var(--header-height);
+}
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* Navigation links: Nunito, bold, uppercase, spaced – like the reference site. */
+.site-nav a:not(.btn),
+.admin-nav a {
+  font-family: var(--font-nav);
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.site-nav a:not(.btn) {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  text-decoration: none;
+}
+.site-nav a:not(.btn):hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.site-nav .btn {
+  margin-left: var(--space-3);
+}
+.nav-toggle {
+  display: none;
+  --btn-fg: #fff;
+}
+.nav-toggle:hover {
+  --btn-bg: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+@media (max-width: 860px) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+  .site-nav {
+    display: none;
+    position: absolute;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: var(--space-2) var(--space-4) var(--space-4);
+    background: var(--color-chrome);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow);
+  }
+  .site-nav[data-open='true'] {
+    display: flex;
+  }
+  .site-nav a:not(.btn) {
+    padding: var(--space-3) 0;
+    border-radius: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .site-nav a:not(.btn):hover {
+    background: none;
+    color: var(--color-chrome-text);
+  }
+  .site-nav .btn {
+    margin: var(--space-4) 0 0;
+  }
+}
+
+/* ---------- Footer (dark, Nunito – as on apollodata.cz) ---------- */
+.site-footer {
+  background: var(--color-chrome);
+  color: var(--color-chrome-text);
+  padding: var(--space-8) 0 var(--space-6);
+  font-family: var(--font-nav);
+  font-size: 1.1rem;
+}
+.site-footer a {
+  color: var(--color-chrome-text);
+  text-decoration: none;
+}
+.site-footer a:hover {
+  color: #fff;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: var(--space-6);
+}
+.footer-grid h2 {
+  font-family: var(--font-nav);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #fff;
+  margin-bottom: var(--space-4);
+}
+.footer-grid ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.footer-copy {
+  margin-top: var(--space-6);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #fff;
+}
+@media (max-width: 760px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Generic page scaffolding ---------- */
+.page {
+  padding: var(--space-7) 0 var(--space-8);
+}
+.page-narrow {
+  max-width: 760px;
+}
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.page-header h1 {
+  font-size: clamp(1.6rem, 1.3rem + 1.2vw, 2.2rem);
+  margin-bottom: var(--space-1);
+}
+.page-header p {
+  margin: 0;
+  color: var(--color-muted);
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-decoration: none;
+  margin-bottom: var(--space-3);
+}
+.back-link:hover {
+  color: var(--color-accent-ink);
+}
+
+.surface-bg {
+  background: var(--color-bg);
+  min-height: calc(100vh - var(--header-height));
+}
+
+.auth-card {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+/* ---------- Portal (clinic) ---------- */
+.portal-header {
+  background: var(--color-chrome);
+  color: #fff;
+}
+/* Light outline button on the dark bar (same as in the admin top bar). */
+.portal-header .btn {
+  --btn-bg: transparent;
+  --btn-fg: #fff;
+  --btn-border: rgba(255, 255, 255, 0.3);
+}
+.portal-header .btn:hover {
+  --btn-bg: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.portal-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: var(--header-height);
+}
+.portal-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.portal-user-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+@media (max-width: 600px) {
+  .portal-user-name {
+    display: none;
+  }
+}
+
+.portal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.portal-grid > .stack,
+.portal-grid > aside {
+  min-width: 0;
+}
+@media (max-width: 960px) {
+  .portal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.status-panel {
+  border-left: 4px solid var(--color-border-strong);
+}
+.status-panel[data-status='pending'] {
+  border-left-color: #e0a63a;
+}
+.status-panel[data-status='approved'] {
+  border-left-color: var(--color-success);
+}
+.status-panel[data-status='rejected'] {
+  border-left-color: var(--color-danger);
+}
+.status-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.status-panel-head h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+.status-message {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.status-message-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  margin-bottom: 4px;
+}
+
+/* Vertical checklist / timeline used in portal and admin history */
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.checklist li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.checklist-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 2px solid var(--color-border-strong);
+  color: var(--color-subtle);
+  background: var(--color-surface);
+}
+.checklist li[data-state='done'] .checklist-icon {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: #fff;
+}
+.checklist li[data-state='current'] .checklist-icon {
+  border-color: #e0a63a;
+  color: var(--color-warning);
+}
+.checklist li[data-state='failed'] .checklist-icon {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: #fff;
+}
+.checklist-title {
+  font-weight: 600;
+}
+.checklist-meta {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.timeline li {
+  position: relative;
+  padding: 0 0 var(--space-4) var(--space-5);
+  border-left: 2px solid var(--color-border);
+  margin-left: 6px;
+}
+.timeline li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-subtle);
+}
+.timeline-meta {
+  font-size: 0.825rem;
+  color: var(--color-muted);
+}
+
+/* ---------- Admin shell ---------- */
+.admin-shell {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+.admin-topbar {
+  background: var(--color-chrome);
+  color: #fff;
+}
+.admin-topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-height: 60px;
+}
+.admin-nav {
+  display: flex;
+  gap: var(--space-1);
+  flex: 1;
+}
+.admin-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.admin-nav a:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.admin-nav a.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+.admin-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+.admin-user .btn {
+  --btn-bg: transparent;
+  --btn-fg: #fff;
+  --btn-border: rgba(255, 255, 255, 0.3);
+}
+.admin-user .btn:hover {
+  --btn-bg: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+@media (max-width: 760px) {
+  .admin-topbar-inner {
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    padding-block: var(--space-2);
+  }
+  .admin-nav {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .admin-user {
+    margin-left: auto;
+  }
+  .admin-user-name {
+    display: none;
+  }
+}
+
+/* ---------- Dashboard ---------- */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.metric {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
+  color: inherit;
+}
+a.metric:hover {
+  border-color: var(--color-border-strong);
+  color: inherit;
+}
+.metric-label {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.metric-value {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-ink-strong);
+  line-height: 1.15;
+}
+.metric-hint {
+  font-size: 0.78rem;
+  color: var(--color-subtle);
+  line-height: 1.35;
+}
+.metric-attention .metric-value {
+  color: var(--color-warning);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bar-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.bar-chart .bar {
+  fill: var(--color-accent);
+}
+.bar-chart .bar-today {
+  fill: var(--color-ink);
+}
+.bar-chart .grid-line {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+.bar-chart text {
+  font-family: var(--font-body);
+  fill: var(--color-muted);
+  font-size: 12px;
+}
+.bar-chart .bar-value {
+  fill: var(--color-ink-strong);
+  font-weight: 700;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.activity-list li {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+.activity-list li:last-child {
+  border-bottom: 0;
+}
+.activity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--color-bg);
+  color: var(--color-slate);
+  flex-shrink: 0;
+}
+.activity-text {
+  font-size: 0.9rem;
+  min-width: 0;
+}
+.activity-text a {
+  font-weight: 600;
+  color: var(--color-ink-strong);
+}
+.activity-time {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) repeat(3, minmax(140px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+@media (max-width: 860px) {
+  .toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .toolbar .toolbar-search {
+    grid-column: span 2;
+  }
+}
+.search-input {
+  position: relative;
+}
+.search-input svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-subtle);
+  pointer-events: none;
+}
+.search-input .input {
+  padding-left: 38px;
+}
+
+.decision-actions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.note {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-warning-soft);
+  border-color: #f3e2bd;
+}
+.note + .note {
+  margin-top: var(--space-3);
+}
+.note-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: 4px;
+}

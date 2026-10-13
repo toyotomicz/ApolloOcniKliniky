@@ -1,0 +1,139 @@
+/* ---------- Hero (centred, plain white – as on apollodata.cz) ---------- */
+.hero {
+  padding: clamp(80px, 14vh, 160px) 0;
+  background: var(--color-surface);
+}
+.hero-inner {
+  text-align: center;
+}
+.hero h1 {
+  margin-bottom: var(--space-4);
+  line-height: 1.5;
+}
+.hero-lead {
+  font-size: clamp(1.15rem, 1rem + 0.6vw, 1.5rem);
+  line-height: 1.5;
+  margin: 0 auto var(--space-6);
+  max-width: 46ch;
+  text-wrap: balance;
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+/* ---------- Sections ---------- */
+.section {
+  padding: var(--space-9) 0;
+}
+.section-alt {
+  background: var(--color-bg);
+}
+.section-head {
+  max-width: 680px;
+  margin-bottom: var(--space-7);
+}
+.section-head-center {
+  margin-inline: auto;
+  text-align: center;
+}
+.section-head-center .lead {
+  margin-inline: auto;
+}
+@media (max-width: 600px) {
+  .section {
+    padding: var(--space-8) 0;
+  }
+}
+
+/* ---------- Plan cards ---------- */
+.plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: stretch;
+}
+.plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.plan-card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow);
+}
+.plan-card-highlighted {
+  border: 2px solid var(--color-ink);
+  box-shadow: var(--shadow);
+}
+.plan-card-highlighted:hover {
+  border-color: var(--color-ink);
+}
+.plan-card[data-selected='true'] {
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+.plan-badge {
+  position: absolute;
+  top: -13px;
+  left: var(--space-5);
+}
+.plan-name {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+}
+.plan-tagline {
+  font-weight: 600;
+  color: var(--color-slate);
+  margin: 2px 0 var(--space-3);
+}
+.plan-description {
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  min-height: 3.2em;
+}
+.plan-card .feature-list {
+  margin: var(--space-3) 0 var(--space-5);
+  font-size: 0.95rem;
+  flex: 1;
+  align-content: start;
+}
+.plan-requirements {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  padding: var(--space-3);
+  background: var(--color-surface-alt);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-4);
+}
+@media (max-width: 900px) {
+  .plans {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    margin-inline: auto;
+    gap: var(--space-6);
+  }
+}
+
+/* ---------- Icon tile (registration success screen) ---------- */
+.prereq-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  flex-shrink: 0;
+}

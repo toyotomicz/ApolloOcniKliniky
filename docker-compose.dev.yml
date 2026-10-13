@@ -1,0 +1,11 @@
+# Optional override for running the API and frontend outside Docker (dotnet run / npm run dev):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile mailpit up -d db mailpit
+# Publishes PostgreSQL and Mailpit SMTP on localhost only.
+services:
+  db:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+  mailpit:
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"

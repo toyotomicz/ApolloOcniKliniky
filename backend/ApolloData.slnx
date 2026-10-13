@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ApolloData.Api/ApolloData.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ApolloData.Api.Tests/ApolloData.Api.Tests.csproj" />
+  </Folder>
+</Solution>
