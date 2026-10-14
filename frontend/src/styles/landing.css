@@ -1,10 +1,96 @@
 /* ---------- Hero (centred, plain white – as on apollodata.cz) ---------- */
 .hero {
+  position: relative;
+  overflow: hidden;
   padding: clamp(80px, 14vh, 160px) 0;
   background: var(--color-surface);
 }
 .hero-inner {
+  position: relative;
+  z-index: 1;
   text-align: center;
+}
+/* Staggered entrance of the heading, text and buttons. */
+.hero-inner > * {
+  animation: hero-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.hero-inner > :nth-child(2) {
+  animation-delay: 0.08s;
+}
+.hero-inner > :nth-child(3) {
+  animation-delay: 0.16s;
+}
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* Iris rings behind the hero: light lines that fade out towards the edges and breathe slowly. */
+.hero-iris {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: hero-fade 1.2s ease-out both;
+}
+.hero-iris svg {
+  width: min(980px, 150vw);
+  max-width: none;
+  height: auto;
+  aspect-ratio: 1;
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  animation: iris-breathe 9s ease-in-out infinite alternate;
+}
+.hero-iris circle {
+  fill: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.hero-iris-ring {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+.hero-iris-fibres {
+  stroke: var(--color-border-strong);
+  stroke-width: 22;
+  stroke-dasharray: 1 7;
+  opacity: 0.45;
+  animation: iris-spin 160s linear infinite;
+}
+.hero-iris-accent {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 16 84;
+  opacity: 0.4;
+  animation: iris-spin 70s linear infinite reverse;
+}
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes iris-breathe {
+  to {
+    transform: scale(1.035);
+  }
+}
+@keyframes iris-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-inner > *,
+  .hero-iris,
+  .hero-iris svg,
+  .hero-iris circle {
+    animation: none;
+  }
 }
 .hero h1 {
   margin-bottom: var(--space-4);
@@ -69,6 +155,48 @@
 .plan-card:hover {
   border-color: var(--color-border-strong);
   box-shadow: var(--shadow);
+}
+/* Landing plan cards: gentle lift and a red accent line on hover / keyboard focus. */
+.plans .plan-card {
+  transition: border-color 0.2s, box-shadow 0.25s, transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.plans .plan-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+.plans .plan-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--space-5);
+  right: var(--space-5);
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.plans .plan-card:hover::before,
+.plans .plan-card:focus-within::before {
+  transform: scaleX(1);
+}
+/* Scroll reveal (see useReveal); "backwards" fill hands transform back to the hover styles afterwards. */
+.plan-card[data-reveal='hidden'] {
+  opacity: 0;
+}
+.plan-card[data-reveal='shown'] {
+  animation: reveal-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0s) backwards;
+}
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plans .plan-card:hover {
+    transform: none;
+  }
 }
 .plan-card-highlighted {
   border: 2px solid var(--color-ink);
