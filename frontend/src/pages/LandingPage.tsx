@@ -1,15 +1,21 @@
 import { ArrowRight } from 'lucide-react'
+import { useRef } from 'react'
 import { Link } from 'react-router'
+import { HeroIris } from '../components/HeroIris'
 import { PlanCard } from '../components/PlanCard'
 import { Alert, LoadingBlock } from '../components/ui'
 import { usePlans } from '../lib/usePlans'
+import { useReveal } from '../lib/useReveal'
 
 export function LandingPage() {
   const { plans, error, retry } = usePlans()
+  const plansRef = useRef<HTMLDivElement>(null)
+  useReveal(plansRef, '.plan-card', Boolean(plans))
 
   return (
     <>
       <section className="hero" aria-labelledby="hero-title">
+        <HeroIris />
         <div className="container hero-inner">
           <h1 id="hero-title">Registrace oční kliniky jednoduše</h1>
           <p className="hero-lead">
@@ -42,7 +48,7 @@ export function LandingPage() {
           )}
           {!plans && !error && <LoadingBlock label="Načítám plány…" />}
           {plans && (
-            <div className="plans">
+            <div className="plans" ref={plansRef}>
               {plans.map((plan) => (
                 <PlanCard
                   key={plan.code}
