@@ -18,7 +18,7 @@ public sealed class SmtpOptions
     public string? FromEmail { get; set; }
     public string FromName { get; set; } = "ApolloData";
 
-    /// <summary>true = STARTTLS (required by Gmail on port 587). false = implicit TLS on port 465, otherwise plain SMTP (Mailpit).</summary>
+    /// <summary>true = STARTTLS (required by Gmail on port 587). false = implicit TLS on port 465, otherwise plain SMTP.</summary>
     public bool UseStartTls { get; set; } = true;
 
     public int TimeoutSeconds { get; set; } = 20;

@@ -1,9 +1,12 @@
-import { Check, CircleDashed, Pencil, RefreshCw, X } from 'lucide-react'
-import { useState } from 'react'
+import { Check, CircleDashed, FileDown, MessageSquare, Pencil, RefreshCw, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import type { ClinicProfile } from '../api/types'
+import { ApiError } from '../api/client'
+import { clinicApi } from '../api/endpoints'
+import type { ClinicProfile, Message } from '../api/types'
 import { useClinicSession } from '../auth/sessions'
 import { ClinicDetails, PlanSummary } from '../components/ClinicDetails'
+import { MessageThread } from '../components/MessageThread'
 import { useToast } from '../components/Toast'
 import { StatusBadge } from '../components/ui'
 import { formatDateTime } from '../lib/format'
@@ -59,6 +62,56 @@ function StatusChecklist({ clinic }: { clinic: ClinicProfile }) {
   )
 }
 
+function ClinicMessages() {
+  const session = useClinicSession()
+  const [messages, setMessages] = useState<Message[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const { markSignedOut } = session
+
+  useEffect(() => {
+    let active = true
+    clinicApi
+      .messages()
+      .then((result) => active && setMessages(result))
+      .catch((e: unknown) => {
+        if (!active) return
+        if (e instanceof ApiError && e.status === 401) markSignedOut()
+        else setError(e instanceof ApiError ? e.message : 'Zprávy se nepodařilo načíst.')
+      })
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [markSignedOut])
+
+  const unread = messages?.filter((m) => m.sender === 'administrator' && m.readAt === null).length ?? 0
+
+  return (
+    <section className="card" aria-labelledby="messages-title" id="zpravy">
+      <div className="card-header">
+        <h2 id="messages-title">
+          <MessageSquare size={18} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />
+          Zprávy s administrátorem
+        </h2>
+        {unread > 0 && <span className="badge badge-accent">{unread === 1 ? '1 nová zpráva' : `${unread} nové zprávy`}</span>}
+      </div>
+      <div className="card-body">
+        <MessageThread
+          viewer="clinic"
+          messages={messages}
+          loading={loading}
+          error={error}
+          onSend={(body) => clinicApi.sendMessage(body)}
+          onSent={(message) => setMessages((current) => [...(current ?? []), message])}
+          onUnauthorized={session.markSignedOut}
+          emptyText="Máte dotaz k registraci? Napište nám – odpověď uvidíte zde a dáme vám vědět e-mailem."
+        />
+      </div>
+    </section>
+  )
+}
+
 export function ClinicPortalPage() {
   const session = useClinicSession()
   const toast = useToast()
@@ -89,6 +142,9 @@ export function ClinicPortalPage() {
           <button type="button" className="btn btn-sm" onClick={refresh} disabled={refreshing}>
             <RefreshCw size={16} aria-hidden="true" /> Obnovit stav
           </button>
+          <a className="btn btn-sm" href={clinicApi.confirmationUrl} download>
+            <FileDown size={16} aria-hidden="true" /> Potvrzení (PDF)
+          </a>
           <Link to="/portal/udaje" className="btn btn-sm btn-dark">
             <Pencil size={16} aria-hidden="true" /> Upravit údaje
           </Link>
@@ -115,6 +171,7 @@ export function ClinicPortalPage() {
               )}
             </div>
           </section>
+          <ClinicMessages />
           <ClinicDetails clinic={clinic} />
         </div>
 

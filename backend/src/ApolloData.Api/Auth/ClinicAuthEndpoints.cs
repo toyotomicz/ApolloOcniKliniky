@@ -3,6 +3,8 @@ using ApolloData.Api.Clinics;
 using ApolloData.Api.Common;
 using ApolloData.Api.Data;
 using ApolloData.Api.Domain;
+using ApolloData.Api.Realtime;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -28,8 +30,14 @@ public static partial class ClinicAuthEndpoints
 
         group.MapPost("/request-code", RequestCodeAsync).RequireRateLimiting(RateLimitPolicies.OtpRequest);
         group.MapPost("/verify-code", VerifyCodeAsync).RequireRateLimiting(RateLimitPolicies.OtpVerify);
-        group.MapPost("/logout", async (HttpContext http, SessionService sessions, CancellationToken ct) =>
+        group.MapPost("/logout", async (HttpContext http, SessionService sessions, AppDbContext db, TimeProvider time, CancellationToken ct) =>
         {
+            var auth = await http.AuthenticateAsync(AuthSchemes.Clinic);
+            if (auth.Succeeded)
+            {
+                db.Record(ActivityEventType.ClinicSignedOut, time.GetUtcNow().UtcDateTime, clinicId: auth.Principal.GetSubjectId());
+                await db.SaveChangesAsync(ct);
+            }
             await sessions.SignOutAsync(http, AuthSchemes.Clinic, ct);
             return TypedResults.NoContent();
         });
@@ -62,7 +70,7 @@ public static partial class ClinicAuthEndpoints
 
     private static async Task<IResult> VerifyCodeAsync(
         VerifyCodeRequest request, HttpContext http, AppDbContext db, ClinicOtpService otp,
-        SessionService sessions, TimeProvider time, CancellationToken ct)
+        SessionService sessions, TimeProvider time, IAdminNotifier notifier, CancellationToken ct)
     {
         var errors = new ValidationErrors();
         var email = Rules.Email(errors, "email", request.Email);
@@ -78,7 +86,8 @@ public static partial class ClinicAuthEndpoints
         }
 
         var now = time.GetUtcNow().UtcDateTime;
-        if (clinic.EmailVerifiedAt is null)
+        var newlyVerified = clinic.EmailVerifiedAt is null;
+        if (newlyVerified)
         {
             // Email verification is independent of administrative approval: status stays as it is.
             clinic.EmailVerifiedAt = now;
@@ -86,6 +95,7 @@ public static partial class ClinicAuthEndpoints
         }
         db.Record(ActivityEventType.ClinicSignedIn, now, clinicId: clinic.Id);
         await db.SaveChangesAsync(ct);
+        if (newlyVerified) await notifier.ClinicsChangedAsync(new ClinicsChangedEvent([clinic.Id], "verified"));
 
         await sessions.SignInClinicAsync(http, clinic, ct);
         return TypedResults.Ok(ClinicProfileDto.From(clinic));

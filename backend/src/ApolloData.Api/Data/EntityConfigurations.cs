@@ -31,6 +31,7 @@ internal sealed class ClinicConfiguration : IEntityTypeConfiguration<Clinic>
         b.HasIndex(c => c.PlanCode);
         b.HasIndex(c => c.CreatedAt);
         b.HasIndex(c => c.OrganizationId);
+        b.HasIndex(c => c.IsDemo);
 
         b.OwnsOne(c => c.OperationalContact, o =>
         {
@@ -49,6 +50,7 @@ internal sealed class ClinicConfiguration : IEntityTypeConfiguration<Clinic>
 
         b.HasMany(c => c.StatusChanges).WithOne().HasForeignKey(s => s.ClinicId).OnDelete(DeleteBehavior.Cascade);
         b.HasMany(c => c.Notes).WithOne().HasForeignKey(n => n.ClinicId).OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(c => c.Messages).WithOne().HasForeignKey(m => m.ClinicId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -71,7 +73,51 @@ internal sealed class AdministratorConfiguration : IEntityTypeConfiguration<Admi
         b.Property(a => a.Username).HasMaxLength(64);
         b.Property(a => a.NormalizedUsername).HasMaxLength(64);
         b.Property(a => a.PasswordHash).HasMaxLength(512);
+        b.Property(a => a.TwoFactorSecret).HasMaxLength(1024);
+        b.Property(a => a.TwoFactorPendingSecret).HasMaxLength(1024);
         b.HasIndex(a => a.NormalizedUsername).IsUnique();
+    }
+}
+
+internal sealed class AdminRecoveryCodeConfiguration : IEntityTypeConfiguration<AdminRecoveryCode>
+{
+    public void Configure(EntityTypeBuilder<AdminRecoveryCode> b)
+    {
+        b.HasKey(c => c.Id);
+        b.Property(c => c.CodeHash).HasMaxLength(32);
+        b.HasOne<Administrator>().WithMany().HasForeignKey(c => c.AdministratorId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(c => c.AdministratorId);
+    }
+}
+
+internal sealed class ClinicMessageConfiguration : IEntityTypeConfiguration<ClinicMessage>
+{
+    public void Configure(EntityTypeBuilder<ClinicMessage> b)
+    {
+        b.HasKey(m => m.Id);
+        b.Property(m => m.Body).HasMaxLength(4000);
+        b.HasOne(m => m.Administrator).WithMany().HasForeignKey(m => m.AdministratorId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(m => new { m.ClinicId, m.CreatedAt });
+        // Unread counters: "messages from clinics nobody has read yet" and per-clinic unread counts.
+        b.HasIndex(m => new { m.Sender, m.ReadAt });
+        b.ToTable(t => t.HasCheckConstraint(
+            "CK_ClinicMessages_Author",
+            """("Sender" = 'Clinic' AND "AdministratorId" IS NULL) OR ("Sender" = 'Administrator' AND "AdministratorId" IS NOT NULL)"""));
+    }
+}
+
+internal sealed class OutboundEmailConfiguration : IEntityTypeConfiguration<OutboundEmail>
+{
+    public void Configure(EntityTypeBuilder<OutboundEmail> b)
+    {
+        b.HasKey(e => e.Id);
+        b.Property(e => e.ToEmail).HasMaxLength(254);
+        b.Property(e => e.ToName).HasMaxLength(200);
+        b.Property(e => e.Subject).HasMaxLength(300);
+        b.Property(e => e.LastError).HasMaxLength(500);
+        b.HasOne<Clinic>().WithMany().HasForeignKey(e => e.ClinicId).OnDelete(DeleteBehavior.SetNull);
+        // The worker only ever looks at undelivered rows that are due.
+        b.HasIndex(e => e.NextAttemptAt).HasFilter("\"SentAt\" IS NULL AND \"FailedAt\" IS NULL");
     }
 }
 
@@ -118,10 +164,11 @@ internal sealed class ActivityEventConfiguration : IEntityTypeConfiguration<Acti
     {
         b.HasKey(e => e.Id);
         b.Property(e => e.Id).UseIdentityAlwaysColumn();
-        b.Property(e => e.Detail).HasMaxLength(200);
+        b.Property(e => e.Detail).HasMaxLength(500);
         b.HasOne(e => e.Clinic).WithMany().HasForeignKey(e => e.ClinicId).OnDelete(DeleteBehavior.SetNull);
         b.HasOne(e => e.Administrator).WithMany().HasForeignKey(e => e.AdministratorId).OnDelete(DeleteBehavior.SetNull);
         b.HasIndex(e => e.OccurredAt);
         b.HasIndex(e => new { e.Type, e.OccurredAt });
+        b.HasIndex(e => new { e.ClinicId, e.OccurredAt });
     }
 }

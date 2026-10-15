@@ -8,6 +8,9 @@
 // Empty by default: the SPA talks to the API on the same origin (/api), proxied by Nginx or Vite.
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
+/** Absolute URL for links that the browser opens itself (file downloads, the realtime hub). */
+export const apiUrl = (path: string): string => `${API_BASE}${path}`
+
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined

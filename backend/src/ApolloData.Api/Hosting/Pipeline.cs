@@ -2,6 +2,7 @@ using ApolloData.Api.Admin;
 using ApolloData.Api.Auth;
 using ApolloData.Api.Clinics;
 using ApolloData.Api.Data;
+using ApolloData.Api.Realtime;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
@@ -59,7 +60,9 @@ public static class Pipeline
         app.MapClinicAuthEndpoints();
         app.MapClinicPortalEndpoints();
         app.MapAdminAuthEndpoints();
+        app.MapAdminSecurityEndpoints();
         app.MapAdminEndpoints();
+        app.MapHub<AdminHub>(AdminHub.Path);
 
         return app;
     }

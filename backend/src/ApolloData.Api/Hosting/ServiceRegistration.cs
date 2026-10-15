@@ -7,6 +7,8 @@ using ApolloData.Api.Common;
 using ApolloData.Api.Data;
 using ApolloData.Api.Domain;
 using ApolloData.Api.Email;
+using ApolloData.Api.Geo;
+using ApolloData.Api.Realtime;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -62,6 +64,8 @@ public static class ServiceRegistration
             });
         services.AddOptions<RateLimitOptions>().Bind(configuration.GetSection("RateLimiting"));
         services.AddOptions<SmtpOptions>().Configure<IConfiguration>(SmtpOptions.Bind);
+        services.AddOptions<EmailOutboxOptions>().Bind(configuration.GetSection("EmailOutbox"));
+        services.AddOptions<GeocodingOptions>().Configure<IConfiguration>(GeocodingOptions.Bind);
 
         // --- Application services --------------------------------------------------------------
         services.AddSingleton<OtpCodeHasher>();
@@ -72,6 +76,34 @@ public static class ServiceRegistration
         services.AddSingleton<ReportingClock>();
         services.AddSingleton<IPasswordHasher<Administrator>, PasswordHasher<Administrator>>();
         services.AddSingleton<IEmailSender, MailKitEmailSender>();
+        services.AddSingleton<AppInfo>();
+        services.AddScoped<ClinicStatusChanger>();
+        services.AddScoped<DemoDataSeeder>();
+        services.AddSingleton<TwoFactorService>();
+        services.AddSingleton<PendingTwoFactorLogin>();
+
+        // --- Background workers: notification email outbox and address geocoding ----------------------
+        services.AddSingleton<EmailOutboxSignal>();
+        services.AddSingleton<EmailOutboxWorker>();
+        services.AddHostedService(sp => sp.GetRequiredService<EmailOutboxWorker>());
+        services.AddSingleton<GeocodingSignal>();
+        services.AddSingleton<GeocodingWorker>();
+        services.AddHostedService(sp => sp.GetRequiredService<GeocodingWorker>());
+        services.AddHttpClient<IGeocoder, NominatimGeocoder>((sp, http) =>
+        {
+            var geo = sp.GetRequiredService<IOptions<GeocodingOptions>>().Value;
+            http.BaseAddress = new Uri(geo.BaseUrl.TrimEnd('/') + "/");
+            http.Timeout = TimeSpan.FromSeconds(10);
+            // Nominatim's usage policy requires an identifying User-Agent.
+            http.DefaultRequestHeaders.UserAgent.ParseAdd($"{sp.GetRequiredService<AppInfo>().Name.Replace(' ', '-')}/1.0 (eye-clinic-registration)");
+        });
+
+        // --- Realtime notifications for administrators (SignalR over WebSockets) ---------------------------
+        services.AddSignalR();
+        services.AddSingleton<IAdminNotifier, SignalRAdminNotifier>();
+
+        // --- PDF rendering (QuestPDF Community license: free for individuals and companies under 1M USD revenue) --
+        QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
         // --- HTTP, JSON, errors ------------------------------------------------------------------
         services.ConfigureHttpJsonOptions(o =>
@@ -144,6 +176,7 @@ public static class ServiceRegistration
             AddIpPolicy(o, RateLimitPolicies.OtpRequest, l => l.OtpRequestPermits);
             AddIpPolicy(o, RateLimitPolicies.OtpVerify, l => l.OtpVerifyPermits);
             AddIpPolicy(o, RateLimitPolicies.AdminLogin, l => l.AdminLoginPermits);
+            AddIpPolicy(o, RateLimitPolicies.Messages, l => l.MessagePermits);
         });
 
         // --- CORS: only explicitly configured origins (not needed when the SPA is served same-origin) --

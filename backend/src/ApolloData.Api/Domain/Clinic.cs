@@ -63,11 +63,30 @@ public sealed class Clinic
     public DateTime PrivacyNoticeAcceptedAt { get; set; }
     public required string PrivacyNoticeVersion { get; set; }
 
+    /// <summary>WGS84 coordinates resolved from the address by the background geocoder (null until resolved).</summary>
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+
+    /// <summary>Time of the last geocoding attempt. Reset when the address changes so it is resolved again.</summary>
+    public DateTime? GeocodedAt { get; set; }
+
+    /// <summary>Created by the optional demo-data command. Demo clinics never receive emails.</summary>
+    public bool IsDemo { get; set; }
+
     /// <summary>Optimistic concurrency token mapped to PostgreSQL's <c>xmin</c> system column.</summary>
     public uint Version { get; set; }
 
     public List<ClinicStatusChange> StatusChanges { get; } = [];
     public List<AdminNote> Notes { get; } = [];
+    public List<ClinicMessage> Messages { get; } = [];
+
+    /// <summary>Clears the resolved location after an address change; the geocoder then resolves it again.</summary>
+    public void ResetLocation()
+    {
+        Latitude = null;
+        Longitude = null;
+        GeocodedAt = null;
+    }
 }
 
 public sealed class OperationalContact

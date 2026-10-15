@@ -6,6 +6,27 @@ namespace ApolloData.Api.Hosting;
 
 internal static class MaintenanceCommands
 {
+    /// <summary>Turns off two-factor authentication of ADMIN_USERNAME (e.g. after losing the phone) and revokes its sessions.</summary>
+    public static async Task<int> ResetAdminTwoFactorAsync(WebApplication app)
+    {
+        var username = app.Configuration["ADMIN_USERNAME"];
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            Console.Error.WriteLine("ADMIN_USERNAME must be set in the environment.");
+            return 2;
+        }
+
+        await using var scope = app.Services.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        await services.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+        var found = await services.GetRequiredService<AdministratorAccounts>()
+            .ResetTwoFactorAsync(username, services.GetRequiredService<SessionService>(), CancellationToken.None);
+        Console.WriteLine(found
+            ? $"Two-factor authentication of administrator '{username}' was turned off; existing sessions were revoked."
+            : $"Administrator '{username}' does not exist.");
+        return found ? 0 : 2;
+    }
+
     public static async Task<int> ResetAdminPasswordAsync(WebApplication app)
     {
         var username = app.Configuration["ADMIN_USERNAME"];
@@ -34,6 +55,36 @@ internal static class MaintenanceCommands
             Console.Error.WriteLine(ex.Message);
             return 2;
         }
+    }
+}
+
+internal static class DemoDataCommand
+{
+    /// <summary><c>seed-demo-data</c> [--remove | --reset]</summary>
+    public static async Task<int> RunAsync(WebApplication app, string[] args)
+    {
+        await app.InitializeDatabaseAsync();
+        await using var scope = app.Services.CreateAsyncScope();
+        var seeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
+        var remove = args.Contains("--remove");
+        var reset = args.Contains("--reset");
+
+        var existing = await seeder.CountAsync(CancellationToken.None);
+        if (remove || reset)
+        {
+            var removed = await seeder.RemoveAsync(CancellationToken.None);
+            Console.WriteLine($"Removed {removed} demo clinic(s).");
+            if (remove) return 0;
+        }
+        else if (existing > 0)
+        {
+            Console.WriteLine($"Demo data already present ({existing} clinics). Use --reset to recreate it or --remove to delete it.");
+            return 0;
+        }
+
+        var created = await seeder.SeedAsync(CancellationToken.None);
+        Console.WriteLine($"Created {created} demo eye clinics (emails @{DemoDataSeeder.EmailDomain}, never delivered).");
+        return 0;
     }
 }
 

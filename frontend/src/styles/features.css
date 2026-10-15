@@ -1,0 +1,444 @@
+/* Styles for messages, realtime, bulk actions, charts, map, audit log and two-factor setup. */
+
+/* ---------- Toast action ---------- */
+.toast .toast-action {
+  margin-left: auto;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.toast .toast-action + button {
+  margin-left: var(--space-2);
+}
+
+/* ---------- Realtime indicator (admin top bar) ---------- */
+.realtime-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+.realtime-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9aa3aa;
+}
+.realtime-indicator[data-status='live'] .realtime-dot {
+  background: #4cc38a;
+  box-shadow: 0 0 0 3px rgba(76, 195, 138, 0.25);
+  animation: realtime-pulse 2.4s ease-in-out infinite;
+}
+.realtime-indicator[data-status='connecting'] .realtime-dot {
+  background: #e0a63a;
+}
+@keyframes realtime-pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgba(76, 195, 138, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .realtime-indicator[data-status='live'] .realtime-dot {
+    animation: none;
+  }
+}
+
+/* The admin nav has five items: let it scroll sideways on narrow screens instead of wrapping. */
+.admin-nav {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.admin-nav a {
+  white-space: nowrap;
+}
+
+/* ---------- Refetch keeps the frame ---------- */
+.is-refreshing {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+/* ---------- Segmented control (period switch) ---------- */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+.segmented button {
+  border: 0;
+  background: none;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.segmented button[aria-pressed='true'] {
+  background: var(--color-chrome);
+  color: #fff;
+}
+.segmented button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- Dashboard charts ---------- */
+.dashboard-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+@media (max-width: 760px) {
+  .dashboard-pair {
+    grid-template-columns: 1fr;
+  }
+}
+.chart-figure {
+  position: relative;
+}
+/* Emphasis: today in the accent, earlier days in a recessive slate (3:1 against the white surface). */
+.bar-chart .bar {
+  fill: #7d8890;
+  transition: opacity 0.12s;
+}
+.bar-chart .bar-today {
+  fill: var(--color-accent);
+}
+.bar-chart .bar-active {
+  opacity: 0.75;
+}
+.bar-chart .bar-hit {
+  fill: transparent;
+  cursor: default;
+}
+.bar-chart .bar-hit:focus-visible {
+  outline: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+.chart-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--color-ink-strong);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+.chart-tooltip strong {
+  font-size: 1rem;
+}
+.chart-tooltip span {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.hbar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.hbar-list li {
+  display: grid;
+  grid-template-columns: minmax(90px, 7.5rem) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.9rem;
+}
+.hbar-label {
+  color: var(--color-ink);
+}
+.hbar-track {
+  height: 12px;
+  display: block;
+}
+.hbar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-slate);
+  /* Square on the baseline, 4px rounded data-end. */
+  border-radius: 0 4px 4px 0;
+}
+.hbar-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 4.5rem;
+}
+
+/* ---------- Message thread ---------- */
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 420px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+.thread-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 85%;
+}
+.thread-message.is-own {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.thread-meta {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  margin-bottom: 4px;
+}
+.thread-bubble {
+  padding: 10px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.925rem;
+}
+.thread-message.is-own .thread-bubble {
+  background: var(--color-chrome);
+  border-color: var(--color-chrome);
+  color: #fff;
+  border-radius: 14px 14px 4px 14px;
+}
+.thread-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.thread-composer .textarea {
+  min-height: 84px;
+}
+
+/* ---------- Bulk actions ---------- */
+.toolbar-toggle {
+  grid-column: 1 / -1;
+  font-size: 0.9rem;
+  align-items: center;
+}
+.toolbar-toggle input {
+  margin-top: 0;
+}
+.bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-soft);
+  border-bottom: 1px solid #f0cfcc;
+}
+.col-select {
+  width: 44px;
+}
+.col-select input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+tr[data-selected='true'] td {
+  background: #fdf6f5;
+}
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+@media (max-width: 860px) {
+  .table-responsive .col-select {
+    width: auto;
+  }
+}
+
+/* ---------- Map ---------- */
+.clinic-map {
+  width: 100%;
+  background: var(--color-bg);
+  z-index: 0;
+}
+.toolbar-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.toolbar-compact > div {
+  min-width: 170px;
+}
+.map-legend {
+  list-style: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: 0.85rem;
+  color: var(--color-ink);
+}
+.map-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.map-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+.map-legend-pending {
+  background: var(--color-warning);
+}
+.map-legend-approved {
+  background: var(--color-success);
+}
+.map-legend-rejected {
+  background: var(--color-danger);
+}
+.map-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.map-popup {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  display: grid;
+  gap: 2px;
+}
+.map-popup strong {
+  font-size: 0.95rem;
+}
+.map-popup .btn-link {
+  justify-self: start;
+  margin-top: 4px;
+  font-size: 0.875rem;
+}
+
+/* ---------- Audit log ---------- */
+/* Flex instead of the shared grid: date inputs have a large intrinsic width, so the row wraps instead of overflowing. */
+.toolbar.toolbar-audit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.toolbar-audit > * {
+  min-width: 0;
+}
+.toolbar-audit .toolbar-search {
+  flex: 2 1 260px;
+}
+.toolbar-audit > div:not(.toolbar-search):not(.date-range) {
+  flex: 1 1 170px;
+}
+.date-range {
+  flex: 1.4 1 330px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.date-range label {
+  flex: 1 1 0;
+  min-width: 140px;
+}
+.date-range .input {
+  width: 100%;
+  min-width: 0;
+}
+.actor-clinic {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+.actor-administrator {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.actor-system {
+  background: #f1f0fa;
+  color: #4b4a7a;
+}
+
+/* ---------- Two-factor setup ---------- */
+.code-input {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  letter-spacing: 0.3em;
+}
+.setup-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: var(--space-4);
+}
+.qr-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-3);
+}
+.qr-box img {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  image-rendering: pixelated;
+}
+.secret-key {
+  margin-top: 4px;
+  font-size: 1rem;
+  color: var(--color-ink-strong);
+  letter-spacing: 0.06em;
+  word-break: break-all;
+}
+.recovery-codes {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius);
+  font-size: 1rem;
+}

@@ -79,4 +79,67 @@ public sealed class UnitTests
     {
         Assert.Equal(@"100\% \_ \\", AdminEndpoints.EscapeLike(@"100% _ \"));
     }
+
+    [Theory]
+    [InlineData("Oční klinika", "\"Oční klinika\"")]
+    [InlineData("=1+1", "\"'=1+1\"")]
+    [InlineData("+420 777", "\"'+420 777\"")]
+    [InlineData("-5", "\"'-5\"")]
+    [InlineData("@SUM(A1)", "\"'@SUM(A1)\"")]
+    [InlineData("Řekl \"ahoj\"", "\"Řekl \"\"ahoj\"\"\"")]
+    [InlineData("", "")]
+    public void Csv_cells_are_quoted_and_formulas_neutralised(string value, string expected) =>
+        Assert.Equal(expected, AuditEndpoints.Cell(value));
+
+    [Fact]
+    public void Recovery_codes_are_unique_readable_and_hash_case_insensitively()
+    {
+        var codes = TwoFactorService.CreateRecoveryCodes();
+        Assert.Equal(TwoFactorService.RecoveryCodeCount, codes.Distinct().Count());
+        Assert.All(codes, c => Assert.Matches("^[A-HJKMNP-Z2-9]{5}-[A-HJKMNP-Z2-9]{5}$", c));
+        Assert.Equal(TwoFactorService.HashRecoveryCode(codes[0]), TwoFactorService.HashRecoveryCode(codes[0].ToLowerInvariant().Replace("-", " ")));
+    }
+
+    [Fact]
+    public void Totp_accepts_adjacent_steps_and_never_the_same_step_twice()
+    {
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 10, 14, 8, 0, 0, TimeSpan.Zero));
+        var provider = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+        var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
+        var service = new TwoFactorService(provider, time, new AppInfo(config));
+        var secret = service.CreateSecret();
+        Assert.Equal(secret.Base32, service.Unprotect(secret.Protected));
+
+        var totp = new OtpNet.Totp(OtpNet.Base32Encoding.ToBytes(secret.Base32));
+        var code = totp.ComputeTotp(time.GetUtcNow().UtcDateTime);
+        var step = service.VerifyCode(secret.Base32, code, lastUsedStep: null);
+        Assert.NotNull(step);
+        Assert.Null(service.VerifyCode(secret.Base32, code, step));          // replay
+        time.Advance(TimeSpan.FromSeconds(30));
+        Assert.Null(service.VerifyCode(secret.Base32, code, step));          // previous step, already used
+        Assert.NotNull(service.VerifyCode(secret.Base32, code, lastUsedStep: null)); // clock drift of one step is tolerated
+        time.Advance(TimeSpan.FromSeconds(60));
+        Assert.Null(service.VerifyCode(secret.Base32, code, lastUsedStep: null));    // too old
+        Assert.Null(service.VerifyCode(secret.Base32, "12345", null));
+        Assert.Null(service.VerifyCode(secret.Base32, "abcdef", null));
+    }
+
+    [Fact]
+    public void Totp_secret_is_grouped_for_manual_entry() =>
+        Assert.Equal("ABCD EFGH IJ", TwoFactorService.FormatForDisplay("ABCDEFGHIJ"));
+
+    [Theory]
+    [InlineData("+420777123456", "+420 777 123 456")]
+    [InlineData("777123456", "777 123 456")]
+    [InlineData("+4915112345678", "+4915112345678")]
+    public void Pdf_phone_numbers_are_grouped(string stored, string expected) =>
+        Assert.Equal(expected, ApolloData.Api.Documents.ConfirmationPdf.FormatPhone(stored));
+
+    [Fact]
+    public void Csv_status_details_are_readable()
+    {
+        Assert.Equal("Čeká na posouzení → Schváleno (hromadně)",
+            AuditEndpoints.DescribeDetail(ApolloData.Api.Domain.ActivityEventType.ClinicStatusChanged, "Pending→Approved;bulk"));
+        Assert.Equal("rows=3", AuditEndpoints.DescribeDetail(ApolloData.Api.Domain.ActivityEventType.AuditLogExported, "rows=3"));
+    }
 }

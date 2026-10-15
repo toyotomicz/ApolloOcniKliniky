@@ -37,6 +37,30 @@ public sealed class Administrator
     public DateTime? LastLoginAt { get; set; }
     public int FailedLoginCount { get; set; }
     public DateTime? LockoutEndAt { get; set; }
+
+    /// <summary>Time-based one-time passwords (RFC 6238, e.g. Google Authenticator) are required after the password.</summary>
+    public bool TwoFactorEnabled { get; set; }
+
+    /// <summary>Confirmed TOTP secret (Base32), encrypted with ASP.NET Core Data Protection.</summary>
+    public string? TwoFactorSecret { get; set; }
+
+    /// <summary>Secret generated during setup; becomes <see cref="TwoFactorSecret"/> once a valid code confirms it.</summary>
+    public string? TwoFactorPendingSecret { get; set; }
+
+    public DateTime? TwoFactorEnabledAt { get; set; }
+
+    /// <summary>Last accepted TOTP time step. Codes from this or an earlier step are rejected (no replay).</summary>
+    public long? TwoFactorLastTimeStep { get; set; }
+}
+
+/// <summary>Single-use recovery code for an administrator with two-factor authentication. Only a hash is stored.</summary>
+public sealed class AdminRecoveryCode
+{
+    public Guid Id { get; set; }
+    public Guid AdministratorId { get; set; }
+    public required byte[] CodeHash { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UsedAt { get; set; }
 }
 
 public enum SessionKind
@@ -83,18 +107,92 @@ public sealed class AdminNote
     public DateTime CreatedAt { get; set; }
 }
 
+public enum MessageSender
+{
+    Clinic,
+    Administrator,
+}
+
+/// <summary>Message in the conversation between a clinic and the administrators.</summary>
+public sealed class ClinicMessage
+{
+    public Guid Id { get; set; }
+    public Guid ClinicId { get; set; }
+    public MessageSender Sender { get; set; }
+
+    /// <summary>Author when <see cref="Sender"/> is <see cref="MessageSender.Administrator"/>.</summary>
+    public Guid? AdministratorId { get; set; }
+    public Administrator? Administrator { get; set; }
+
+    public required string Body { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>When the other side (clinic or any administrator) first read the message.</summary>
+    public DateTime? ReadAt { get; set; }
+}
+
+public enum OutboundEmailKind
+{
+    StatusChanged,
+    NewMessage,
+}
+
+/// <summary>
+/// Transactional outbox for notification emails: rows are written in the same transaction as the change
+/// that triggers them and delivered by a background worker with retries, so an SMTP outage loses nothing.
+/// </summary>
+public sealed class OutboundEmail
+{
+    public Guid Id { get; set; }
+    public OutboundEmailKind Kind { get; set; }
+    public Guid? ClinicId { get; set; }
+    public required string ToEmail { get; set; }
+    public string? ToName { get; set; }
+    public required string Subject { get; set; }
+    public required string TextBody { get; set; }
+    public required string HtmlBody { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime NextAttemptAt { get; set; }
+    public int Attempts { get; set; }
+    public DateTime? SentAt { get; set; }
+
+    /// <summary>Set when delivery was given up after the maximum number of attempts.</summary>
+    public DateTime? FailedAt { get; set; }
+
+    /// <summary>Safe diagnostic of the last failure (exception type / SMTP status); never credentials.</summary>
+    public string? LastError { get; set; }
+}
+
 public enum ActivityEventType
 {
     ClinicRegistered,
     ClinicEmailVerified,
     ClinicSignedIn,
+    ClinicSignedOut,
     ClinicProfileUpdated,
     ClinicStatusChanged,
+    ClinicMessageSent,
+    ConfirmationDownloaded,
     AdminNoteAdded,
     AdminSignedIn,
+    AdminSignedOut,
+    AdminSignInFailed,
+    AdminMessageSent,
+    AdminTwoFactorEnabled,
+    AdminTwoFactorDisabled,
+    AdminRecoveryCodesRenewed,
+    AdminPasswordReset,
+    AuditLogExported,
+    EmailSent,
+    EmailFailed,
+    DemoDataSeeded,
+    DemoDataRemoved,
 }
 
-/// <summary>Append-only activity log used for the dashboard feed and "unique clinic sign-ins" metric.</summary>
+/// <summary>
+/// Append-only audit log of every state-changing action (who, what, when, on which clinic).
+/// Feeds the dashboard activity, the "unique clinic sign-ins" metric and the downloadable audit log.
+/// </summary>
 public sealed class ActivityEvent
 {
     public long Id { get; set; }
@@ -105,6 +203,6 @@ public sealed class ActivityEvent
     public Guid? AdministratorId { get; set; }
     public Administrator? Administrator { get; set; }
 
-    /// <summary>Short machine-friendly detail, e.g. "Pending→Approved". Never contains secrets.</summary>
+    /// <summary>Short machine-friendly detail, e.g. "Pending→Approved" or "Pending→Approved;bulk". Never contains secrets.</summary>
     public string? Detail { get; set; }
 }

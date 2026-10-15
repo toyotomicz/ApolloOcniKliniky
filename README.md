@@ -1,228 +1,529 @@
 # ApolloData – registrační portál očních klinik
 
-Demonstrační full-stack aplikace pro technický pohovor: registrace **očních klinik** – veřejná stránka se třemi plány, registrace kliniky
-s údaji podle plánu, přihlašování klinik jednorázovým kódem z e-mailu (bez hesla), portál kliniky se stavem
-schválení a administrace se statistikami, seznamem klinik, schvalováním/zamítáním a interními poznámkami.
+[![CI](https://github.com/toyotomicz/ApolloOcniKliniky/actions/workflows/ci.yml/badge.svg)](https://github.com/toyotomicz/ApolloOcniKliniky/actions/workflows/ci.yml)
 
-> **Nezávislý demonstrační projekt.** Nejde o oficiální službu ani integraci VZP či jiné instituce a nevyjadřuje
-> žádnou podporu z jejich strany. „ApolloData“ je pracovní název (změna v `frontend/src/config/branding.ts`
-> a `APP_NAME`). Názvy a obsah plánů jsou provizorní, bez cen. Aplikace nezpracovává žádné údaje o pacientech.
+Full-stack webová aplikace pro registraci **očních klinik**. Klinika si na veřejné stránce vybere plán, zaregistruje se,
+přihlašuje se jednorázovým kódem z e-mailu (bez hesla) a v portálu sleduje stav registrace, komunikuje
+s administrátorem a stahuje potvrzení v PDF. Administrátor registrace posuzuje – jednotlivě i hromadně – a má
+k dispozici přehled se statistikami, mapu klinik, audit log s exportem, notifikace v reálném čase a dvoufázové
+přihlášení přes Google Authenticator.
+
+Vzhled (barvy, písma) je sladěný s webem [apollodata.cz](https://www.apollodata.cz/).
+
+| | |
+|---|---|
+| **Produkční instance** | http://147.228.121.223 (administrace: `/admin`) |
+| **Repozitář** | https://github.com/toyotomicz/ApolloOcniKliniky (soukromý) |
+| **Technologie** | .NET 10 · ASP.NET Core · EF Core · PostgreSQL 17 · React 19 · TypeScript · Vite · Docker |
+
+> **Nezávislý projekt.** Nejde o oficiální službu ani integraci VZP či jiné instituce. Názvy a obsah plánů jsou
+> provizorní a bez cen. Aplikace nezpracovává žádné údaje o pacientech.
 
 ---
 
 ## Obsah
 
-1. [Architektura a technologie](#architektura-a-technologie)
-2. [Rychlý start (Docker)](#rychlý-start-docker)
-3. [Konfigurace (.env)](#konfigurace-env)
-4. [E-mail: Gmail nebo Mailpit](#e-mail-gmail-nebo-mailpit)
-5. [Administrátor](#administrátor)
-6. [Ukázkový scénář (demo)](#ukázkový-scénář-demo)
-7. [Spuštění bez Dockeru](#spuštění-bez-dockeru)
-8. [Databáze a migrace](#databáze-a-migrace)
-9. [Testy](#testy)
-10. [API](#api)
-11. [Bezpečnost](#bezpečnost)
-12. [Předpoklady, omezení a další kroky](#předpoklady-omezení-a-další-kroky)
-13. [Řešení problémů](#řešení-problémů)
+1. [Funkce](#funkce)
+2. [Architektura](#architektura)
+3. [Lokální spuštění (Docker)](#lokální-spuštění-docker)
+4. [Nasazení na server](#nasazení-na-server)
+5. [Konfigurace (.env)](#konfigurace-env)
+6. [E-mail (Gmail)](#e-mail-gmail)
+7. [Administrátor a dvoufázové ověření](#administrátor-a-dvoufázové-ověření)
+8. [Demo data](#demo-data)
+9. [Ukázkový scénář](#ukázkový-scénář)
+10. [Vývoj bez Dockeru](#vývoj-bez-dockeru)
+11. [Databáze a migrace](#databáze-a-migrace)
+12. [Testy a CI](#testy-a-ci)
+13. [API](#api)
+14. [Bezpečnost](#bezpečnost)
+15. [Předpoklady a omezení](#předpoklady-a-omezení)
+16. [Řešení problémů](#řešení-problémů)
 
 ---
 
-## Architektura a technologie
+## Funkce
 
-```
-Prohlížeč ──► web (Nginx: SPA + reverse proxy /api) ──► api (ASP.NET Core 10) ──► db (PostgreSQL 17)
-                                                           └──► SMTP (Gmail / Mailpit)
+### Pro kliniky
+
+- **Úvodní stránka** se třemi plány (Basic / Standard / Premium) a decentními animacemi.
+- **Průvodce registrací** – kroky určuje zvolený plán: Standard přidává provozní kontakt, Premium navíc konfiguraci
+  služby (počet pracovišť, forma úvodního nastavení, technický kontakt). Validace na klientu i serveru, kontrola IČO.
+- **Přihlášení bez hesla** – šestimístný jednorázový kód z e-mailu.
+- **Portál kliniky** – stav a průběh registrace, zpráva/důvod od administrátora, úprava kontaktních údajů,
+  **zprávy s administrátorem** a **potvrzení o registraci v PDF**.
+- **E-maily** – přihlašovací kód, oznámení o schválení / zamítnutí / vrácení k posouzení (s důvodem) a upozornění
+  na novou zprávu od administrátora.
+
+### Pro administrátory
+
+- **Přehled** – metriky (registrace, nové dnes, čekající, schválené, zamítnuté, nepřečtené zprávy, průměrná doba
+  do rozhodnutí, míra schválení, přihlášené kliniky dnes), graf registrací za 7 / 30 dní, průchod registrací
+  (registrace → ověřený e-mail → schválení), rozdělení podle plánů a poslední aktivita.
+- **Kliniky** – vyhledávání (název, e-mail, město, IČO), filtry podle stavu, plánu a nepřečtených zpráv, řazení,
+  stránkování a **hromadné akce** (schválit / zamítnout / vrátit k posouzení vybrané kliniky v jedné transakci).
+- **Detail kliniky** – všechny údaje, rozhodnutí s potvrzením (zamítnutí vyžaduje důvod), historie stavů,
+  interní poznámky, **konverzace s klinikou**, malá mapa polohy, PDF potvrzení a odkaz do audit logu.
+- **Mapa klinik** – OpenStreetMap, barva značky podle stavu, filtry, proklik na detail. Polohu z adresy dohledává
+  proces na pozadí.
+- **Notifikace v reálném čase** (SignalR přes WebSocket) – nová registrace nebo zpráva se okamžitě ohlásí
+  a otevřené přehledy se samy obnoví. Stav spojení ukazuje indikátor „Živě“ v horní liště.
+- **Audit log** – kdo, kdy a co udělal (registrace, přihlášení včetně neúspěšných, změny stavu, zprávy, odeslané
+  e-maily, exporty…), filtry a **export do CSV** pro Excel.
+- **Zabezpečení** – **dvoufázové ověření přes Google Authenticator** (QR kód, záložní kódy).
+
+---
+
+## Architektura
+
+```mermaid
+flowchart LR
+    browser["Prohlížeč<br/>React SPA"]
+    subgraph docker["Docker Compose"]
+        web["web<br/>Nginx: SPA + reverse proxy"]
+        api["api<br/>ASP.NET Core 10"]
+        outbox[["EmailOutboxWorker"]]
+        geo[["GeocodingWorker"]]
+        db[("db<br/>PostgreSQL 17")]
+    end
+    smtp["Gmail SMTP"]
+    nominatim["OSM Nominatim<br/>(adresa → souřadnice)"]
+    tiles["OSM mapové dlaždice"]
+
+    browser -- "/  statické soubory" --> web
+    browser -- "/api  REST + cookies" --> web
+    browser -- "/hubs  WebSocket (SignalR)" --> web
+    browser -. "mapové dlaždice" .-> tiles
+    web --> api
+    api --> db
+    api -- "kód pro přihlášení" --> smtp
+    api --- outbox
+    api --- geo
+    outbox -- "e-maily o stavu a zprávách" --> smtp
+    outbox --> db
+    geo --> nominatim
+    geo --> db
 ```
 
 | Vrstva | Technologie |
 |---|---|
-| Frontend | React 19, TypeScript (strict), Vite 8, React Router 8, React Hook Form + Zod, Lucide, vlastní CSS design systém (bez UI knihoven) sladěný s apollodata.cz – barvy `#313336`/`#c93a32`, písma Open Sans, Saira a Nunito (self-hosted), tokeny v `frontend/src/styles/tokens.css` |
-| Backend | ASP.NET Core Minimal API (.NET 10), EF Core 10 + Npgsql, MailKit, ASP.NET Core Identity `PasswordHasher`, ProblemDetails, rate limiting, antiforgery |
-| Databáze | PostgreSQL 17, migrace EF Core (commitnuté v `backend/src/ApolloData.Api/Data/Migrations`) |
-| Testy | xUnit v3 + Testcontainers (skutečný PostgreSQL), Vitest + React Testing Library |
-| Provoz | Docker Compose (db, api, web, volitelně mailpit), Nginx pro produkční build SPA |
+| Frontend | React 19, TypeScript (strict), Vite 8, React Router 8, React Hook Form + Zod, Lucide ikony, Leaflet (mapa), `@microsoft/signalr`; vlastní CSS bez UI knihoven – barvy `#313336` / `#c93a32`, písma Open Sans, Saira a Nunito (self-hosted) |
+| Backend | ASP.NET Core Minimal API (.NET 10), EF Core 10 + Npgsql, MailKit, SignalR, QuestPDF, Otp.NET + QRCoder, ASP.NET Core Identity `PasswordHasher`, Data Protection, rate limiting, antiforgery |
+| Databáze | PostgreSQL 17, migrace EF Core |
+| Testy | xUnit v3 + Testcontainers (skutečný PostgreSQL), Vitest + React Testing Library, GitHub Actions |
+| Provoz | Docker Compose (`db`, `api`, `web`), Nginx (statické soubory, proxy `/api` a `/hubs`, bezpečnostní hlavičky) |
+
+### Struktura repozitáře
 
 ```
 apollo/
+├─ .github/workflows/ci.yml   automatické testy na GitHubu
 ├─ backend/
 │  ├─ src/ApolloData.Api/
-│  │  ├─ Domain/          entity (Clinic, ClinicLoginChallenge, Administrator, UserSession, …)
-│  │  ├─ Data/            DbContext, Fluent API konfigurace, migrace
+│  │  ├─ Domain/          entity (Clinic, ClinicMessage, OutboundEmail, Administrator, ActivityEvent, …)
+│  │  ├─ Data/            DbContext, Fluent API konfigurace, migrace, zápis do audit logu
 │  │  ├─ Plans/           PlanCatalog – jediný zdroj definic plánů
 │  │  ├─ Clinics/         registrace, portál kliniky, validace, DTO
-│  │  ├─ Auth/            OTP, relace, cookie schémata, administrátorské účty
-│  │  ├─ Admin/           dashboard, seznam a detail klinik, změny stavu
-│  │  ├─ Email/           MailKit sender, šablona e-mailu
-│  │  ├─ Common/          validace, ProblemDetails, globální zpracování výjimek
-│  │  └─ Hosting/         registrace služeb, pipeline, CSRF middleware, údržbové příkazy
+│  │  ├─ Messages/        konverzace klinika ↔ administrátor
+│  │  ├─ Auth/            jednorázové kódy, relace, 2FA (TOTP, záložní kódy), administrátorské účty
+│  │  ├─ Admin/           přehled, seznam/detail, změny stavu, hromadné akce, audit log + CSV
+│  │  ├─ Realtime/        SignalR hub a notifikace pro administrátory
+│  │  ├─ Documents/       PDF potvrzení (QuestPDF)
+│  │  ├─ Geo/             geokódování adres na pozadí (Nominatim)
+│  │  ├─ Email/           odesílání (MailKit), HTML šablony, transakční outbox + worker
+│  │  ├─ Common/          validace, ProblemDetails, AppInfo
+│  │  └─ Hosting/         registrace služeb, pipeline, CSRF, údržbové příkazy, demo data
 │  └─ tests/ApolloData.Api.Tests/   integrační a jednotkové testy
 ├─ frontend/
-│  ├─ src/{api,auth,components,layouts,pages,lib,styles,config}
-│  └─ nginx/              konfigurace Nginx (SPA fallback, proxy, bezpečnostní hlavičky)
-├─ scripts/               init-env.ps1, reset-admin.ps1, run-api-local.ps1
-├─ docker-compose.yml     hlavní stack
-├─ docker-compose.dev.yml publikuje DB/Mailpit na localhost pro vývoj bez Dockeru
+│  ├─ src/{api,admin,auth,components,layouts,pages,lib,styles,config}
+│  └─ nginx/              konfigurace Nginx
+├─ scripts/               init-env, deploy, seed-demo, reset-admin, reset-admin-2fa, run-api-local
+├─ docker-compose.yml     celý stack
+├─ docker-compose.dev.yml publikuje DB na localhost pro vývoj bez Dockeru
 └─ .env.example           šablona konfigurace (jen zástupné hodnoty)
 ```
 
-**Klíčová rozhodnutí**
+### Klíčová rozhodnutí
 
-- **Plány** jsou definovány na jednom místě – `backend/src/ApolloData.Api/Plans/PlanCatalog.cs`. Frontend z
-  `GET /api/plans` vykresluje karty plánů i kroky registrace; backend podle stejného katalogu validuje.
-  Basic = základní údaje; Standard = + provozní kontakt; Premium = + provozní kontakt + konfigurace služby.
-- **Relace** jsou serverové: HttpOnly cookie nese jen ID relace, která se při každém požadavku ověřuje v tabulce
-  `UserSessions` (odhlášení/odvolání platí okamžitě). Klinika a administrátor mají oddělená cookie schémata,
-  takže lze mít v jednom prohlížeči otevřený portál kliniky i administraci.
-- **Vlastnictví dat**: endpointy kliniky nemají v URL žádné ID – klinika se vždy určuje ze serverové relace.
+- **Plány na jednom místě** – `Plans/PlanCatalog.cs`. Frontend z `GET /api/plans` vykresluje karty i kroky
+  registrace, backend podle stejného katalogu validuje.
+- **Serverové relace** – HttpOnly cookie nese jen ID relace, která se při každém požadavku ověřuje v databázi,
+  takže odhlášení a odvolání platí okamžitě. Klinika a administrátor mají oddělená cookie schémata.
+- **Žádná ID v URL kliniky** – endpointy kliniky určují kliniku vždy ze serverové relace, klinika tedy nemůže
+  adresovat cizí data.
+- **Transakční outbox pro e-maily** – e-mail o změně stavu se zapíše do tabulky `OutboundEmails` ve stejné
+  transakci jako změna; odešle ho worker na pozadí a při chybě opakuje. Výpadek Gmailu nic neztratí.
+- **Realtime jen jako signál** – SignalR posílá jen „něco se změnilo“; data se vždy načítají přes REST API
+  se stejnou autorizací.
+- **Audit log jako jediný zdroj historie** – všechny akce (i systémové) se zapisují do `ActivityEvents`;
+  z něj čerpá přehled, metrika přihlášení i stahovatelný audit log.
+
+### Model dat
+
+```mermaid
+erDiagram
+    Clinics ||--o{ ClinicStatusChanges : "historie stavů"
+    Clinics ||--o{ AdminNotes : "interní poznámky"
+    Clinics ||--o{ ClinicMessages : "konverzace"
+    Clinics ||--o{ ClinicLoginChallenges : "kódy (jen HMAC)"
+    Clinics ||--o{ UserSessions : "relace kliniky"
+    Clinics |o--o{ OutboundEmails : "odchozí e-maily"
+    Clinics |o--o{ ActivityEvents : "audit"
+    Administrators ||--o{ UserSessions : "relace administrátora"
+    Administrators ||--o{ AdminRecoveryCodes : "záložní kódy 2FA"
+    Administrators ||--o{ ClinicStatusChanges : "rozhodl"
+    Administrators |o--o{ ActivityEvents : "audit"
+    Administrators |o--o{ ClinicMessages : "odpověděl"
+
+    Clinics {
+        uuid Id PK
+        string Name
+        string NormalizedEmail UK
+        string PlanCode
+        string Status "Pending, Approved, Rejected"
+        double Latitude "z geokódování"
+        double Longitude
+        bool IsDemo
+        xid xmin "token souběžnosti"
+    }
+    ClinicMessages {
+        uuid Id PK
+        uuid ClinicId FK
+        string Sender "Clinic, Administrator"
+        string Body
+        timestamptz ReadAt
+    }
+    OutboundEmails {
+        uuid Id PK
+        string Kind "StatusChanged, NewMessage"
+        int Attempts
+        timestamptz NextAttemptAt
+        timestamptz SentAt
+        timestamptz FailedAt
+    }
+    Administrators {
+        uuid Id PK
+        string Username UK
+        string PasswordHash "PBKDF2"
+        bool TwoFactorEnabled
+        string TwoFactorSecret "šifrováno Data Protection"
+        bigint TwoFactorLastTimeStep "ochrana proti replay"
+    }
+    ActivityEvents {
+        bigint Id PK
+        string Type
+        timestamptz OccurredAt
+        string Detail
+    }
+```
+
+### Stavy registrace
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: registrace (ověřovací kód e-mailem)
+    Pending --> Approved: administrátor schválí
+    Pending --> Rejected: administrátor zamítne (důvod povinný)
+    Approved --> Pending: vrátit k posouzení
+    Rejected --> Pending: vrátit k posouzení
+    Approved --> Rejected
+    Rejected --> Approved
+    note right of Pending
+        Ověření e-mailu je nezávislé na schválení.
+        Každá změna: historie + audit + e-mail klinice
+        (jedna transakce), hromadně i jednotlivě.
+    end note
+```
+
+### Přihlášení kliniky kódem z e-mailu
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor K as Klinika
+    participant SPA
+    participant API
+    participant DB as PostgreSQL
+    participant G as Gmail SMTP
+    K->>SPA: zadá e-mail
+    SPA->>API: POST /api/clinic-auth/request-code
+    API->>DB: nová výzva: HMAC(kód), platnost 10 min, starší kódy zneplatněny
+    API->>G: e-mail s kódem
+    API-->>SPA: 202 (stejná odpověď i pro neznámý e-mail)
+    K->>SPA: zadá 6místný kód
+    SPA->>API: POST /api/clinic-auth/verify-code
+    API->>DB: atomická spotřeba výzvy (max. 5 pokusů)
+    API->>DB: relace + audit (ověření e-mailu, přihlášení)
+    API-->>SPA: 200 + HttpOnly cookie s ID relace
+```
+
+### Přihlášení administrátora s dvoufázovým ověřením
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Administrátor
+    participant SPA
+    participant API
+    participant DB as PostgreSQL
+    A->>SPA: jméno + heslo
+    SPA->>API: POST /api/admin-auth/login
+    API->>DB: ověření hesla (PBKDF2), zámek po 5 chybách
+    API-->>SPA: 202 twoFactorRequired + šifrovaná cookie (5 min, zatím žádná relace)
+    A->>SPA: kód z Google Authenticatoru (nebo záložní kód)
+    SPA->>API: POST /api/admin-auth/login/two-factor
+    API->>DB: ověření TOTP (±30 s), kód nesmí být použit podruhé
+    API->>DB: relace + audit „přihlášení (heslo + kód)“
+    API-->>SPA: 200 + HttpOnly cookie s ID relace
+```
+
+### Změna stavu → e-mail a notifikace
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Administrátor
+    participant API
+    participant DB as PostgreSQL
+    participant W as EmailOutboxWorker
+    participant G as Gmail SMTP
+    participant H as SignalR hub
+    A->>API: POST /api/admin/clinics/{id}/status (nebo bulk-status)
+    API->>DB: jedna transakce: stav + historie + audit + řádek v OutboundEmails
+    API->>W: probuzení
+    API->>H: clinicsChanged → otevřené přehledy se obnoví
+    API-->>A: 200
+    W->>DB: načte čekající e-maily
+    W->>G: odeslání
+    alt doručeno
+        W->>DB: SentAt + audit „odeslaný e-mail“
+    else chyba SMTP
+        W->>DB: Attempts++, NextAttemptAt = exponenciální čekání (po 6 pokusech FailedAt + audit)
+    end
+```
 
 ---
 
-## Rychlý start (Docker)
+## Lokální spuštění (Docker)
 
-Předpoklady: Windows 10/11 s **Docker Desktop** (WSL 2), ~4 GB volného místa na disku pro image.
+Předpoklady: Windows 10/11 s **Docker Desktop** (WSL 2) a aspoň **5 GB volného místa** na disku pro sestavení obrazů.
 
-```bash
-powershell -ExecutionPolicy Bypass -File scripts/init-env.ps1 -Mailpit
-```
-
-Skript vytvoří `.env` z `.env.example` a vygeneruje náhodná hesla (`POSTGRES_PASSWORD`, `ADMIN_PASSWORD`,
-`OTP_HASH_KEY`). Přepínač `-Mailpit` nastaví lokální zachytávání e-mailů (nic neodchází ven). Bez něj se použije
-šablona pro Gmail – viz níže.
-
-```bash
-docker compose up --build
-```
-
-Při prvním startu API automaticky aplikuje migrace a vytvoří administrátora. Data se ukládají do pojmenovaného
-volume `db-data` a restart kontejnerů je nesmaže.
+1. Vytvořte konfiguraci – skript zkopíruje `.env.example` do `.env` a vygeneruje náhodná hesla
+   (`POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `OTP_HASH_KEY`):
+   ```bash
+   powershell -ExecutionPolicy Bypass -File scripts/init-env.ps1
+   ```
+2. Do `.env` doplňte údaje pro Gmail – viz [E-mail (Gmail)](#e-mail-gmail).
+3. Spusťte stack:
+   ```bash
+   docker compose up -d --build
+   ```
+   Při prvním startu API aplikuje migrace a vytvoří administrátora. Data jsou ve volume `db-data`
+   a restart kontejnerů je nesmaže.
+4. Volitelně nahrajte [demo data](#demo-data).
 
 | Adresa | Co tam je |
 |---|---|
-| http://localhost:8080 | veřejná stránka, registrace, přihlášení kliniky (`/prihlaseni`), portál (`/portal`) |
-| http://localhost:8080/admin | administrace (přihlášení `/admin/prihlaseni`) |
-| http://localhost:8025 | Mailpit – doručené kódy (jen s profilem `mailpit`) |
+| http://localhost:8080 | úvodní stránka, registrace, přihlášení kliniky (`/prihlaseni`), portál (`/portal`) |
+| http://localhost:8080/admin | administrace (přihlášení `/admin/prihlaseni`, jméno `admin`, heslo z `ADMIN_PASSWORD`) |
 | http://localhost:8080/swagger | Swagger UI (jen při `ENABLE_SWAGGER=true` nebo `ASPNETCORE_ENVIRONMENT=Development`) |
 
-Databáze nemá ve výchozí konfiguraci publikovaný port; API je dostupné jen přes Nginx.
+Zastavení: `docker compose down` (data zůstanou). Smazání včetně dat: `docker compose down -v`.
 
-Zastavení: `docker compose down` (data zůstanou). Úplné smazání včetně dat: `docker compose down -v`.
+---
+
+## Nasazení na server
+
+Aplikace běží na serveru **147.228.121.223** (Ubuntu 26.04 LTS, 1 CPU, 4 GB RAM) – http://147.228.121.223.
+Stačí 2 GB RAM; za běhu stack spotřebuje zhruba 0,5–1 GB.
+
+### Jak je server nastavený
+
+| Co | Kde / jak |
+|---|---|
+| Docker | `docker.io` + `docker-compose-v2` z balíčků Ubuntu, služba `docker` se spouští po startu |
+| Aplikace | `/opt/apollodata` – `docker-compose.yml` a `.env` (práva `600`, jen root) |
+| Obrazy | `apollodata-api`, `apollodata-web` (sestavené lokálně a přenesené), `postgres:17-alpine` |
+| Port | 80 (HTTP) – `WEB_PORT=80`; databáze nemá publikovaný port |
+| Firewall | `ufw`: povoleno jen SSH (22) a HTTP (80) |
+| Restart | kontejnery mají `restart: unless-stopped` – po restartu serveru se spustí samy |
+
+Serverový `.env` vychází z lokálního, s těmito rozdíly: `WEB_PORT=80`, `APP_PUBLIC_URL=http://147.228.121.223`,
+`COOKIE_SECURE=false` (server zatím nemá HTTPS) a vlastní vygenerované `POSTGRES_PASSWORD` a `OTP_HASH_KEY`.
+
+### Nasazení nové verze
+
+Obrazy se sestaví na vývojovém počítači a přes SSH se přenesou na server – server nepotřebuje zdrojový kód
+ani .NET/Node a nesestavuje nic na svém jediném jádru.
+
+```bash
+powershell -File scripts/deploy.ps1
+```
+
+Skript zkontroluje Docker a volné místo, sestaví obrazy `api` a `web`, přenese je (`docker save | ssh docker load`),
+zkopíruje `docker-compose.yml` do `/opt/apollodata` a restartuje stack; migrace databáze se aplikují automaticky
+při startu API. Serverový `.env` se nikdy nepřepisuje. Parametry: `-Server`, `-User` (výchozí `root`),
+`-SkipBuild` (jen přenese existující obrazy).
+
+### První instalace na čistý server
+
+```bash
+ssh root@SERVER 'apt-get update && apt-get install -y docker.io docker-compose-v2 && systemctl enable --now docker'
+```
+
+```bash
+ssh root@SERVER 'mkdir -p /opt/apollodata && chmod 700 /opt/apollodata'
+```
+
+Pak na server zkopírujte připravený `.env` (`scp .env root@SERVER:/opt/apollodata/.env`, upravte `WEB_PORT`,
+`APP_PUBLIC_URL`, `COOKIE_SECURE` a vygenerujte nová hesla), spusťte `scripts/deploy.ps1 -Server SERVER`
+a povolte firewall:
+
+```bash
+ssh root@SERVER 'ufw allow OpenSSH && ufw allow 80/tcp && ufw --force enable'
+```
+
+### Údržba na serveru
+
+Všechny příkazy se spouštějí v `/opt/apollodata` (`ssh root@147.228.121.223`, pak `cd /opt/apollodata`):
+
+| Úkol | Příkaz |
+|---|---|
+| Stav kontejnerů | `docker compose ps` |
+| Logy API | `docker compose logs -f api` |
+| Restart | `docker compose restart` |
+| Změna hesla administrátora | upravit `ADMIN_PASSWORD` v `.env`, pak `docker compose run --rm api reset-admin-password` |
+| Vypnutí 2FA (ztracený telefon) | `docker compose run --rm api reset-admin-2fa` |
+| Demo data nahrát / odstranit | `docker compose run --rm api seed-demo-data` / `… seed-demo-data --remove` |
+| Záloha databáze | `docker compose exec -T db pg_dump -U apollo apollodata > zaloha.sql` |
+| Úklid starých obrazů | `docker image prune -f` |
+
+### HTTPS
+
+Server zatím běží na čistém HTTP – hesla a kódy tak po síti putují nešifrovaně, proto je `COOKIE_SECURE=false`.
+Pro ostrý provoz je potřeba doména (např. `apollo.example.cz`) nasměrovaná na IP serveru; pak stačí před Nginx
+předřadit Caddy s automatickým certifikátem Let's Encrypt, otevřít port 443, nastavit `COOKIE_SECURE=true`
+a `APP_PUBLIC_URL=https://…`.
 
 ---
 
 ## Konfigurace (.env)
 
-Soubor `.env` se **nikdy necommituje** (je v `.gitignore`). Všechny proměnné:
+Soubor `.env` se **nikdy necommituje** (je v `.gitignore`). Proměnné:
 
 | Proměnná | Výchozí | Popis |
 |---|---|---|
-| `WEB_PORT` | `8080` | port, na kterém Nginx publikuje aplikaci |
-| `APP_NAME` | `ApolloData` | název v e-mailech |
+| `WEB_PORT` | `8080` | port, na kterém Nginx publikuje aplikaci (na serveru `80`) |
+| `APP_NAME` | `ApolloData` | název v e-mailech, PDF a v aplikaci Authenticator |
+| `APP_PUBLIC_URL` | `http://localhost:8080` | veřejná adresa aplikace pro odkazy v e-mailech |
 | `ASPNETCORE_ENVIRONMENT` | `Production` | `Development` zapne Swagger a detail výjimek v odpovědích |
 | `ENABLE_SWAGGER` | `false` | Swagger UI i mimo Development |
-| `COOKIE_SECURE` | `true` | příznak `Secure` u relačních cookies; prohlížeče jej akceptují i na `http://localhost`. `false` jen pro přístup přes HTTP z jiného počítače |
-| `REPORTING_TIME_ZONE` | `Europe/Prague` | časové pásmo pro „dnes“ a denní sloupce grafu |
+| `COOKIE_SECURE` | `true` | příznak `Secure` u cookies; prohlížeče ho na `http://localhost` akceptují. Na serveru bez HTTPS `false` |
+| `REPORTING_TIME_ZONE` | `Europe/Prague` | časové pásmo pro „dnes“, graf, PDF a CSV |
 | `POSTGRES_DB` / `POSTGRES_USER` | `apollodata` / `apollo` | databáze a uživatel |
-| `POSTGRES_PASSWORD` | – (povinné) | heslo DB; pouze písmena a číslice |
+| `POSTGRES_PASSWORD` | – (povinné) | heslo DB; jen písmena a číslice |
 | `ADMIN_USERNAME` | `admin` | uživatelské jméno počátečního administrátora |
 | `ADMIN_PASSWORD` | – (povinné při 1. startu) | min. 12 znaků; bez něj API při prázdné databázi odmítne nastartovat |
-| `OTP_HASH_KEY` | náhodný za běhu | klíč HMAC pro otisky jednorázových kódů |
+| `OTP_HASH_KEY` | náhodný za běhu | klíč HMAC pro otisky jednorázových kódů (nastavte, jinak kódy po restartu propadnou) |
 | `SMTP_HOST` / `SMTP_PORT` | `smtp.gmail.com` / `587` | SMTP server |
-| `SMTP_USERNAME` / `SMTP_PASSWORD` | – | přihlašovací údaje SMTP (Gmail: adresa + App Password) |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | – | přihlašovací údaje (Gmail: adresa + heslo aplikace) |
 | `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` | = username / `ApolloData` | odesílatel |
-| `SMTP_USE_STARTTLS` | `true` | `true` = STARTTLS (Gmail 587); `false` = bez TLS (Mailpit), na portu 465 implicitní TLS |
-| `COMPOSE_PROFILES` | – | `mailpit` spustí i kontejner Mailpit |
-| `MAILPIT_UI_PORT` | `8025` | port webového rozhraní Mailpitu |
+| `SMTP_USE_STARTTLS` | `true` | `true` = STARTTLS (Gmail 587); `false` = implicitní TLS na portu 465, jinak bez TLS |
+| `GEOCODING_ENABLED` | `true` | dohledávání polohy klinik pro mapu (OpenStreetMap Nominatim) |
+| `GEOCODING_CONTACT_EMAIL` | – | kontakt předávaný Nominatimu (doporučeno jeho pravidly) |
 
-Pokročilé (appsettings / proměnné prostředí): `Auth__OtpLifetimeMinutes` (10), `Auth__OtpMaxAttempts` (5),
+Pokročilé (proměnné prostředí / `appsettings.json`): `Auth__OtpLifetimeMinutes` (10), `Auth__OtpMaxAttempts` (5),
 `Auth__OtpResendCooldownSeconds` (60), `Auth__OtpMaxCodesPerHour` (5), `Auth__AdminMaxFailedAttempts` (5),
-`Auth__AdminLockoutMinutes` (15), `Auth__ClinicSessionHours`/`AdminSessionHours` (8),
-`RateLimiting__*Permits` a `RateLimiting__WindowSeconds` (limity na IP adresu), `CORS_ALLOWED_ORIGINS`
-(jen pokud SPA běží na jiném originu), `DATABASE_MIGRATE_ON_STARTUP` (`true`).
+`Auth__AdminLockoutMinutes` (15), `Auth__ClinicSessionHours` / `AdminSessionHours` (8),
+`RateLimiting__*Permits` a `RateLimiting__WindowSeconds` (limity na IP), `EmailOutbox__MaxAttempts` (6),
+`EmailOutbox__RetryBaseSeconds` (30), `EmailOutbox__PollIntervalMilliseconds` (15000), `GEOCODING_URL`,
+`CORS_ALLOWED_ORIGINS` (jen pro SPA na jiném originu), `DATABASE_MIGRATE_ON_STARTUP` (`true`).
 
 ---
 
-## E-mail: Gmail nebo Mailpit
-
-### Gmail (skutečné doručení)
+## E-mail (Gmail)
 
 1. Na účtu Google zapněte **dvoufázové ověření** (Účet Google → Zabezpečení).
-2. Vytvořte **heslo aplikace**: https://myaccount.google.com/apppasswords → název např. „ApolloData“ → zkopírujte
-   16znakové heslo.
-3. V **lokálním** `.env` nastavte:
+2. Vytvořte **heslo aplikace** na https://myaccount.google.com/apppasswords (název např. „ApolloData“)
+   a zkopírujte 16znakové heslo.
+3. V `.env` nastavte:
    ```
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
    SMTP_USE_STARTTLS=true
    SMTP_USERNAME=vase.adresa@gmail.com
-   SMTP_PASSWORD=<heslo aplikace – zadejte jen do .env>
+   SMTP_PASSWORD=<heslo aplikace, bez mezer>
    SMTP_FROM_EMAIL=vase.adresa@gmail.com
    ```
-   a zakomentujte/odstraňte `COMPOSE_PROFILES=mailpit` a SMTP řádky pro Mailpit.
-4. `docker compose up -d --build api` (API načte novou konfiguraci).
-5. Test: zaregistrujte kliniku se svou skutečnou adresou nebo na `/prihlaseni` požádejte o kód pro již
-   registrovaný e-mail. Kód přijde do schránky (zkontrolujte i spam).
+4. Restartujte API: `docker compose up -d api`.
 
-Heslo nikdy nevkládejte do zdrojových souborů, dokumentace ani do chatu. Při chybě SMTP API zapíše do logu
-bezpečnou diagnostiku (host, port, typ chyby, SMTP kód) – nikdy heslo ani kód: `docker compose logs api`.
+| E-mail | Kdy | Jak se odesílá |
+|---|---|---|
+| Přihlašovací kód | registrace, žádost o kód | ihned; při chybě dostane uživatel hlášku a může kód poslat znovu |
+| Změna stavu registrace | schválení, zamítnutí (s důvodem), vrácení k posouzení – i hromadně | přes outbox, až 6 pokusů s rostoucím odstupem |
+| Nová zpráva | administrátor napíše klinice | přes outbox; text zprávy v e-mailu **není** (čte se v portálu) |
 
-### Mailpit (lokálně, bez odesílání)
-
-`scripts/init-env.ps1 -Mailpit` vše nastaví. Ručně: v `.env` odkomentujte blok „Option B“
-(`COMPOSE_PROFILES=mailpit`, `SMTP_HOST=mailpit`, `SMTP_PORT=1025`, `SMTP_USE_STARTTLS=false`).
-Kódy si přečtete na http://localhost:8025.
+Demo kliniky (`@demo.apollodata.test`) nedostávají žádné e-maily. Chyby SMTP zapisuje API do logu bezpečně
+(host, port, typ chyby, SMTP kód – nikdy heslo ani kód); odeslané a neodeslané e-maily jsou i v audit logu.
 
 ---
 
-## Administrátor
+## Administrátor a dvoufázové ověření
 
-- Veřejná registrace administrátorů neexistuje.
-- Při startu API se podle `ADMIN_USERNAME`/`ADMIN_PASSWORD` **vytvoří** administrátor, pokud ještě neexistuje.
-  Seedování je idempotentní – existující účet se neduplikuje a jeho heslo se **nikdy** automaticky nepřepíše.
-- Chybí-li `ADMIN_PASSWORD` a v databázi není žádný administrátor, API skončí s jasnou chybou konfigurace
-  (žádné výchozí heslo).
-- **Změna/obnova hesla** (lokální údržbový příkaz, není dostupný přes HTTP): změňte `ADMIN_PASSWORD` v `.env` a spusťte
-  ```bash
-  powershell -File scripts/reset-admin.ps1
-  ```
-  (= `docker compose run --rm api reset-admin-password`). Účet se vytvoří nebo resetuje, zruší se zámek a odhlásí
-  se jeho existující relace.
-- Po 5 neúspěšných pokusech se účet na 15 minut zamkne; přihlášení je navíc omezeno na IP adresu.
+- Veřejná registrace administrátorů neexistuje. Při prvním startu se podle `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+  vytvoří administrátor; existující účet se nikdy neduplikuje a jeho heslo se **automaticky nepřepisuje**.
+- **Změna hesla**: upravte `ADMIN_PASSWORD` v `.env` (min. 12 znaků) a spusťte `scripts/reset-admin.ps1`
+  (lokálně) nebo `docker compose run --rm api reset-admin-password` (server). Zruší se zámek a odhlásí relace.
+- Po **5 neúspěšných pokusech** (heslo i kód 2FA) se účet na 15 minut zamkne; přihlášení je navíc omezeno na IP.
 
----
+**Dvoufázové ověření (Google Authenticator)** – v administraci *Zabezpečení*:
 
-## Ukázkový scénář (demo)
+1. „Zapnout dvoufázové ověření“ → naskenujte QR kód v aplikaci (nebo opište klíč).
+2. Zadejte kód z aplikace → zobrazí se **10 záložních kódů** (jen jednou – stáhněte si je nebo zkopírujte).
+3. Od té doby se po hesle zadává šestimístný kód. Záložní kód lze použít místo kódu z aplikace, každý jen jednou.
 
-Doporučeno s Mailpitem (http://localhost:8025 v druhé záložce).
-
-1. Otevřete http://localhost:8080 – úvod a tři plány.
-2. U plánu **Standard** klikněte na „Zvolit Standard“.
-3. Vyplňte údaje kliniky (např. IČO `25596641` má platný kontrolní součet), pokračujte – plán Standard přidá krok
-   **Provozní kontakt**; Premium navíc **Konfiguraci služby**. Prázdné kroky ukážou validaci.
-4. V souhrnu potvrďte zásady zpracování a odešlete. Registrace se uloží ve stavu **Čeká na posouzení**.
-5. V Mailpitu otevřete e-mail s kódem a zadejte jej → e-mail se ověří a otevře se **portál kliniky**.
-6. Portál ukazuje plán, údaje, datum registrace, ověření e-mailu a stav **Čeká na posouzení** s dalšími kroky.
-7. Odhlaste se (vpravo nahoře).
-8. Otevřete http://localhost:8080/admin a přihlaste se (`admin` + heslo z `.env`).
-9. **Přehled**: metriky (celkem, nové dnes, čeká, schválené, zamítnuté, přihlášené kliniky dnes), graf 7 dní,
-   poslední aktivita.
-10. **Kliniky**: vyhledejte název/e-mail/IČO, filtrujte stavem a plánem, řaďte, stránkujte.
-11. Otevřete detail kliniky → **Schválit registraci** (nebo Zamítnout – důvod je povinný a uvidí jej klinika),
-    volitelně interní poznámka. Akce vyžaduje potvrzení.
-12. Znovu se přihlaste jako klinika (`/prihlaseni`, nový kód z Mailpitu) – portál ukazuje nový stav a zprávu;
-    interní poznámka se klinice nezobrazí.
-13. V administraci zkontrolujte změněné statistiky a **Historii stavů** v detailu (kdo, kdy, z jakého stavu, důvod).
-
-Žádná demo data se nenahrávají automaticky – vše v ukázce vzniká skutečnou registrací a je uloženo v PostgreSQL.
+Ztracený telefon a žádný záložní kód: `scripts/reset-admin-2fa.ps1` (lokálně) nebo
+`docker compose run --rm api reset-admin-2fa` (server) vypne 2FA pro `ADMIN_USERNAME` a odhlásí jeho relace.
+Tajné klíče 2FA jsou šifrované klíči Data Protection ve volume `api-keys` – po jeho smazání je nutný tento reset.
 
 ---
 
-## Spuštění bez Dockeru
+## Demo data
 
-Pro vývoj (hot reload). Potřebujete .NET SDK 10, Node.js 22.12+ a PostgreSQL (nejjednodušeji z kontejneru):
+Pro prezentaci lze nahrát **45 realistických očních klinik po celé ČR** – různé plány a stavy, historie rozhodnutí,
+interní poznámky, konverzace (některé nepřečtené) a aktivita za posledních ~6 týdnů. Všechny mají polohu na mapě.
+
+| Akce | Lokálně | Na serveru |
+|---|---|---|
+| Nahrát | `powershell -File scripts/seed-demo.ps1` | `docker compose run --rm api seed-demo-data` |
+| Vytvořit znovu | `… seed-demo.ps1 -Reset` | `… seed-demo-data --reset` |
+| Odstranit | `… seed-demo.ps1 -Remove` | `… seed-demo-data --remove` |
+
+Demo kliniky mají e-maily v rezervované doméně `@demo.apollodata.test`, nikdy jim neodchází e-mail a v detailu jsou
+označené štítkem „Demo data“. Skutečných registrací se příkazy nedotknou.
+
+---
+
+## Ukázkový scénář
+
+1. Otevřete úvodní stránku → „Zvolit Standard“ → vyplňte údaje (IČO `25596641` má platný kontrolní součet,
+   adresa např. `Americká 42, 301 00 Plzeň`) a s vlastní e-mailovou adresou registraci odešlete.
+2. Ve druhém okně mějte otevřenou administraci – **nová registrace se ihned ohlásí** a přehled i seznam se obnoví.
+3. Zadejte kód z e-mailu → otevře se **portál kliniky**. Napište administrátorovi zprávu, stáhněte **potvrzení v PDF**.
+4. V administraci: upozornění „Nová zpráva“ → detail kliniky → odpovězte (klinice přijde e-mail) a **schvalte**
+   registraci (přijde e-mail o schválení). Za chvíli se klinika objeví na **mapě**.
+5. **Kliniky** → zaškrtněte několik demo klinik → **hromadné schválení**.
+6. **Audit log** → filtr „Změna stavu registrace“ → **Stáhnout CSV**.
+7. **Zabezpečení** → zapněte Google Authenticator, odhlaste se a přihlaste znovu s kódem.
+
+---
+
+## Vývoj bez Dockeru
+
+Pro vývoj s hot reloadem: .NET SDK 10, Node.js 22.12+ a PostgreSQL (nejjednodušeji z kontejneru).
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile mailpit up -d db mailpit
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
 ```
 
 ```bash
@@ -233,135 +534,132 @@ powershell -File scripts/run-api-local.ps1
 cd frontend && npm install && npm run dev
 ```
 
-API běží na http://localhost:5080 (Swagger http://localhost:5080/swagger), SPA na http://localhost:5173 –
-Vite proxyuje `/api` na API, takže frontend volá vždy relativní `/api`. Skript `run-api-local.ps1` načte `.env`,
-přesměruje DB i Mailpit na `localhost` a spustí API v režimu Development (necertifikované HTTP → `COOKIE_SECURE=false`).
+API běží na http://localhost:5080 (Swagger `/swagger`), SPA na http://localhost:5173; Vite proxyuje `/api`
+i `/hubs` (WebSocket) na API. `run-api-local.ps1` načte `.env`, přesměruje databázi na `localhost` a spustí API
+v režimu Development.
 
 ---
 
 ## Databáze a migrace
 
-- Schéma je spravováno migracemi EF Core (`backend/src/ApolloData.Api/Data/Migrations`, commitnuté).
-- API je při startu aplikuje (`DATABASE_MIGRATE_ON_STARTUP=true`); existující data se nemažou.
-- Nová migrace (z adresáře `backend`):
+- Schéma spravují migrace EF Core (`backend/src/ApolloData.Api/Data/Migrations`); API je aplikuje při startu
+  (`DATABASE_MIGRATE_ON_STARTUP=true`) a existující data zachová.
+- Nová migrace (v adresáři `backend`):
   ```bash
   dotnet tool restore
   ```
   ```bash
   dotnet ef migrations add NazevZmeny --project src/ApolloData.Api --output-dir Data/Migrations
   ```
-- Hlavní tabulky: `Clinics` (plánové údaje jako owned types, `xmin` jako token souběžnosti), `ClinicLoginChallenges`
-  (pouze HMAC kódu), `Administrators`, `UserSessions`, `ClinicStatusChanges` (audit), `AdminNotes`, `ActivityEvents`.
-- Časy se ukládají v UTC (`timestamptz`).
+- Časy se ukládají v UTC (`timestamptz`); do `REPORTING_TIME_ZONE` se převádějí až při zobrazení, v PDF a CSV.
 
 ---
 
-## Testy
+## Testy a CI
 
 ```bash
 cd backend && dotnet test
 ```
 
-Integrační testy spouštějí skutečný PostgreSQL přes **Testcontainers** (vyžaduje běžící Docker). E-mail je
-nahrazen falešným odesílatelem, čas `FakeTimeProvider` – testy nikdy nepoužívají Gmail.
-
 ```bash
 cd frontend && npm test
 ```
 
-Pokrytí (výběr): validace registrace a plánových polí, IČO, uložení do DB (UTC, normalizace), duplicitní e-mail,
-over-posting, OTP (hash, expirace, znovupoužití, nahrazení novým kódem, limit pokusů, cooldown, neznámý e-mail
-se stejnou odpovědí, výpadek SMTP), odvolání relace po odhlášení, CSRF, vlastnictví dat mezi klinikami,
-autorizace administrátorských endpointů, zámek účtu, idempotentní seeding, schválení/zamítnutí s auditem
-a soukromou poznámkou, optimistická souběžnost, vyhledávání/filtry/stránkování, statistiky a denní řada,
-rate limiting; na frontendu průchod průvodcem registrace, mapování serverových chyb, přihlášení kódem,
-přesměrování nepřihlášených, dashboard a dialog zamítnutí.
+- **Backend – 90 testů.** Integrační testy běží proti skutečnému PostgreSQL v Testcontainers (vyžaduje Docker).
+  E-mail nahrazuje falešný odesílatel, geokódování falešný geokodér a čas `FakeTimeProvider` – testy nikdy
+  nepoužívají Gmail ani internet.
+- **Frontend – 26 testů** (Vitest + React Testing Library), plus `npm run lint` (oxlint) a `npm run typecheck`.
+- **GitHub Actions** (`.github/workflows/ci.yml`) při každém pushi do `main` a každém pull requestu spustí build
+  a testy backendu (varování = chyby), lint, typovou kontrolu, testy a build frontendu a sestavení Docker obrazů.
 
-Výsledky posledního běhu jsou v [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+Co testy pokrývají (výběr): validace registrace a plánových polí, IČO, jednorázové kódy (hash, expirace, opakované
+použití, limity, výpadek SMTP), relace, CSRF, vlastnictví dat, autorizace, zámek účtu, schválení a zamítnutí
+s auditem, optimistická souběžnost, e-maily přes outbox včetně opakování po výpadku SMTP, hromadné akce, zprávy
+a jejich čtení, PDF, audit log a CSV (včetně ochrany proti vzorcům v Excelu), 2FA (TOTP, replay, záložní kódy,
+reset), mapa a geokódování, SignalR hub (autorizace a doručení události), demo data, statistiky; na frontendu
+průvodce registrací, přihlášení kódem, přehled, hromadné akce, 2FA přihlášení, zprávy v portálu a animace úvodní stránky.
 
 ---
 
 ## API
 
-Všechny odpovědi jsou JSON; chyby ve formátu RFC 7807 (`application/problem+json`, validační chyby v `errors`
-podle názvů polí). Nebezpečné metody vyžadují hlavičku `X-CSRF-TOKEN` (token z `GET /api/security/csrf`).
+Odpovědi jsou JSON, chyby ve formátu RFC 7807 (`application/problem+json`, validační chyby v `errors` podle polí).
+Nebezpečné metody vyžadují hlavičku `X-CSRF-TOKEN` (token z `GET /api/security/csrf`).
 
 | Metoda | Cesta | Přístup | Popis |
 |---|---|---|---|
 | GET | `/api/plans` | veřejné | definice plánů |
 | GET | `/api/security/csrf` | veřejné | antiforgery token |
-| POST | `/api/registrations` | veřejné, rate limit | registrace kliniky (+ odeslání ověřovacího kódu) |
-| POST | `/api/clinic-auth/request-code` | veřejné, rate limit | vyžádání kódu (vždy stejná odpověď 202) |
-| POST | `/api/clinic-auth/verify-code` | veřejné, rate limit | ověření kódu → relace kliniky |
-| POST | `/api/clinic-auth/logout` | – | odhlášení kliniky |
-| GET/PUT | `/api/clinic/me` | klinika | vlastní údaje / úprava povolených polí |
-| POST | `/api/admin-auth/login` | veřejné, rate limit | přihlášení administrátora |
-| POST | `/api/admin-auth/logout` | – | odhlášení |
-| GET | `/api/admin-auth/me` | admin | přihlášený administrátor |
-| GET | `/api/admin/dashboard` | admin | metriky, graf 7 dní, aktivita |
-| GET | `/api/admin/clinics` | admin | `search`, `status`, `plan`, `sort` (`createdAt`/`name`/`status`/`plan`), `direction`, `page`, `pageSize` |
-| GET | `/api/admin/clinics/{id}` | admin | detail, historie stavů, poznámky, verze |
+| POST | `/api/registrations` | veřejné, rate limit | registrace kliniky + odeslání ověřovacího kódu |
+| POST | `/api/clinic-auth/request-code`, `/verify-code`, `/logout` | veřejné, rate limit | přihlášení kliniky kódem |
+| GET / PUT | `/api/clinic/me` | klinika | vlastní údaje / úprava povolených polí |
+| GET | `/api/clinic/me/confirmation.pdf` | klinika | potvrzení o registraci |
+| GET / POST | `/api/clinic/messages` | klinika | konverzace (čtení označí odpovědi jako přečtené) |
+| POST | `/api/admin-auth/login` | veřejné, rate limit | heslo → `200` (relace) nebo `202 { twoFactorRequired }` |
+| POST | `/api/admin-auth/login/two-factor` | veřejné, rate limit | `{ code }` nebo `{ recoveryCode }` → relace |
+| POST / GET | `/api/admin-auth/logout`, `/api/admin-auth/me` | admin | odhlášení, přihlášený administrátor |
+| GET / POST | `/api/admin/security/two-factor` (+ `/setup`, `/enable`, `/disable`, `/recovery-codes`) | admin | správa 2FA |
+| GET | `/api/admin/dashboard?days=7\|30` | admin | metriky, průchod registrací, plány, graf, aktivita |
+| GET | `/api/admin/clinics` | admin | `search`, `status`, `plan`, `unread`, `sort`, `direction`, `page`, `pageSize` |
+| GET | `/api/admin/clinics/map` | admin | kliniky se souřadnicemi (`status`, `plan`) + počet bez polohy |
+| GET | `/api/admin/clinics/{id}` | admin | detail, historie, poznámky, poloha, verze |
+| GET | `/api/admin/clinics/{id}/confirmation.pdf` | admin | PDF potvrzení kliniky |
 | POST | `/api/admin/clinics/{id}/status` | admin | `{ status, message?, internalNote?, version }` |
+| POST | `/api/admin/clinics/bulk-status` | admin | `{ clinicIds (max. 100), status, message? }` – jedna transakce |
 | POST | `/api/admin/clinics/{id}/notes` | admin | `{ text }` |
-| GET | `/health/live`, `/health/ready` | interní | health checky (ready ověřuje DB) |
+| GET / POST | `/api/admin/clinics/{id}/messages` | admin | konverzace s klinikou |
+| GET | `/api/admin/audit` | admin | `from`, `to`, `type`, `actor`, `clinicId`, `search`, `page`, `pageSize` |
+| GET | `/api/admin/audit/export` | admin | stejné filtry → CSV (UTF-8 s BOM, oddělovač `;`) |
+| WS | `/hubs/admin` | admin | SignalR: `registrationCreated`, `messageReceived`, `clinicsChanged` |
+| GET | `/health/live`, `/health/ready` | interní | health checky (ready ověřuje databázi) |
 
-**Definice metrik dashboardu** (`DashboardService.cs`): *Registrované kliniky* = všechny záznamy; *Nové dnes* =
-`CreatedAt` v aktuálním dni dle `REPORTING_TIME_ZONE`; *Čeká/Schválené/Zamítnuté* = aktuální stav; *Přihlášené
-kliniky dnes* = počet **různých** klinik s úspěšným přihlášením kódem dnes (z tabulky aktivit – nejde o registrace);
-graf = registrace po lokálních dnech za posledních 7 dní včetně dneška, chybějící dny = 0.
+**Definice metrik** (`Admin/DashboardService.cs`): *Nové dnes* = registrace od místní půlnoci; *Přihlášené kliniky
+dnes* = počet různých klinik přihlášených kódem dnes; *Nepřečtené zprávy* = zprávy od klinik, které žádný
+administrátor neotevřel; *Doba do rozhodnutí* = průměr od registrace po první schválení/zamítnutí (rozhodnutí za
+posledních 90 dní); *Míra schválení* = schválené / (schválené + zamítnuté) podle aktuálního stavu.
 
 ---
 
 ## Bezpečnost
 
-Implementováno:
+- **Jednorázové kódy**: 6 číslic z kryptografického generátoru, v databázi jen HMAC-SHA256, platnost 10 min,
+  max. 5 pokusů, atomická spotřeba, nový kód ruší starší, cooldown 60 s, max. 5 kódů/h, rate limit na IP.
+  Neznámý e-mail dostane stejnou odpověď jako registrovaný.
+- **Administrátoři**: PBKDF2 (`PasswordHasher`), zámek účtu, rate limit; **2FA TOTP** – tajemství šifrované
+  Data Protection, tolerance ±30 s, každý kód jen jednou, relace vzniká až po obou faktorech, záložní kódy jako SHA-256.
+- **Relace**: HttpOnly, `SameSite=Strict`, `Secure` (dle `COOKIE_SECURE`), serverová validace a odvolání, 8 h.
+- **CSRF**: antiforgery token v hlavičce + `SameSite=Strict`; CORS jen pro výslovně nastavené originy.
+- **Autorizace**: oddělené politiky pro kliniku a administrátora; klinika nemá v API žádné ID, a nemůže tak číst
+  cizí údaje, zprávy ani PDF. Klinice se nezobrazují uživatelská jména administrátorů.
+- **SignalR hub** vyžaduje administrátorskou relaci a nemá žádné metody volatelné z prohlížeče.
+- **Audit log** všech změn a přihlášení, včetně neúspěšných (zadané jméno se neukládá – lidé do něj občas píšou heslo).
+- **CSV export** neutralizuje vzorce (`=`, `+`, `-`, `@` → apostrof), aby název kliniky nespustil vzorec v Excelu.
+- **E-maily**: uživatelské texty HTML-escapované, text zprávy se do e-mailu nevkládá, demo kliniky nedostávají nic.
+- **Mapa**: popupy se skládají přes DOM (`textContent`), ne z HTML řetězců.
+- Explicitní DTO, validace na serveru, parametrizované dotazy (escapovaný LIKE), optimistická souběžnost (`xmin`),
+  produkční chyby bez detailů výjimek.
+- **Nginx**: CSP (dlaždice jen z `tile.openstreetmap.org`), `X-Frame-Options`, `nosniff`, `Referrer-Policy`,
+  `Permissions-Policy`; databáze bez publikovaného portu; API kontejner běží pod neprivilegovaným uživatelem.
 
-- Jednorázové kódy: 6 číslic z `RandomNumberGenerator`, uložen jen **HMAC-SHA256** (vázaný na ID výzvy),
-  platnost 10 min, max. 5 pokusů, atomická spotřeba podmíněným `UPDATE`, nový kód ruší starší, cooldown 60 s
-  a max. 5 kódů/h na účet, rate limit na IP. Kód se neloguje.
-- Neznámý e-mail dostane stejnou odpověď jako registrovaný (bez úniku existence účtu).
-- Hesla administrátorů: ASP.NET Core Identity `PasswordHasher` (PBKDF2), zámek účtu, rate limit, konstantní
-  chování pro neznámé jméno.
-- Relace: HttpOnly, `SameSite=Strict`, `Secure` (konfigurovatelné), serverová validace a odvolání, 8 h, odhlášení.
-- CSRF: antiforgery token v hlavičce u všech nebezpečných požadavků + SameSite=Strict; CORS jen pro výslovně
-  nastavené originy (ve výchozím stavu same-origin přes Nginx).
-- Autorizace na serveru: oddělené politiky Clinic/Admin; klinika nemá v API žádné ID → nemůže číst cizí data.
-- Explicitní DTO (žádné entity v API, žádný over-posting), validace na serveru, EF Core parametrizované dotazy
-  (LIKE wildcardy escapované).
-- Audit změn stavu v transakci (jeden `SaveChanges`) s optimistickou souběžností (`xmin`).
-- Produkční chybové odpovědi bez detailů výjimek; strukturované JSON logy; `Cache-Control: no-store` u API.
-- Nginx: CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`; DB bez publikovaného portu;
-  API kontejner běží jako ne-root uživatel.
-
-Před produkčním nasazením navíc: TLS (reverzní proxy / load balancer) a HSTS; správa tajemství mimo `.env`
-(Key Vault, Docker secrets); šifrování klíčů Data Protection (log varuje „No XML encryptor configured“ – klíče
-jsou ve volume `api-keys` nešifrované) a sdílené úložiště klíčů při více instancích; nastavit `OTP_HASH_KEY`;
-distribuovaný rate limiting při více instancích; zálohování DB; dedikovaný e-mailový provider (SPF/DKIM) místo
-Gmailu; právně posouzené zásady zpracování údajů; monitoring a centralizace logů.
+Pro ostrý provoz zbývá: **HTTPS** (viz [Nasazení → HTTPS](#https)), tajemství mimo `.env`, šifrování klíčů Data
+Protection, pravidelné zálohy databáze, dedikovaný e-mailový provider (SPF/DKIM) místo Gmailu a monitoring.
+Při více instancích API navíc distribuovaný rate limiting, Redis backplane pro SignalR a claimování řádků outboxu.
 
 ---
 
-## Předpoklady, omezení a další kroky
+## Předpoklady a omezení
 
-Zadání bylo rekonstruováno z ústního pohovoru; tyto body jsou zvolené výchozí hodnoty (snadno změnitelné):
-
-- **Plány** Basic/Standard/Premium, jejich texty a dodatečná pole jsou provizorní (`PlanCatalog.cs`). Žádné ceny.
-- **Stavový model**: Pending / Approved / Rejected. Administrátor může nastavit kterýkoli jiný stav (včetně „Vrátit
-  k posouzení“); zamítnutí vyžaduje důvod viditelný klinice, zpráva klinice je i u jiných stavů volitelná.
-- **Ověření e-mailu ≠ schválení**: ověření nastane prvním úspěšným zadáním kódu; schválení je vždy ruční.
-  Schválit lze i kliniku bez ověřeného e-mailu (UI na to upozorní).
-- Klinika může upravit kontaktní osobu, telefon, adresu a plánová pole; **název, IČO, e-mail a plán** mění jen
-  administrace (zatím bez UI – změna e-mailu by vyžadovala nové ověření). Úpravy se zaznamenávají do aktivit.
-- Registrace hned odešle ověřovací kód. Při výpadku SMTP se registrace uloží a uživatel může kód poslat znovu.
-- Registrace s již použitým e-mailem vrací 409 (registrace ze své podstaty existenci účtu prozrazuje; přihlášení ne).
-  Odezva `request-code` se u existujícího e-mailu může časově lišit (odesílá se e-mail) a při výpadku SMTP vrací
-  503 – vědomý kompromis ve prospěch srozumitelné chyby.
-- Časové pásmo statistik: Europe/Prague.
-- Bez demo seedu – data vznikají v ukázce reálnou registrací.
-
-Možná rozšíření (podle priority): e-mailové notifikace klinice při změně stavu; administrace změny e-mailu/plánu
-kliniky; export seznamu (CSV); správa více administrátorů a rolí; trvalé/sdílené úložiště rate limitů a Data
-Protection klíčů pro více instancí; E2E testy (Playwright); lokalizace do angličtiny.
+- **Plány** a jejich texty jsou provizorní (`Plans/PlanCatalog.cs`), bez cen.
+- **Stavy**: Pending / Approved / Rejected; zamítnutí vyžaduje důvod viditelný klinice.
+- **Ověření e-mailu ≠ schválení** – schválení je vždy ruční; schválit lze i kliniku bez ověřeného e-mailu
+  (administrace na to upozorní).
+- Klinika mění kontakty, adresu a plánová pole; **název, IČO, e-mail a plán** mění jen administrace (zatím bez UI).
+  Po změně adresy se poloha dohledá znovu.
+- **Mapa**: veřejný Nominatim povoluje max. 1 dotaz/s, nové kliniky se proto na mapě objeví s malým zpožděním;
+  nenalezené adresy se zkusí znovu po 24 h. Odesílá se jen ulice, PSČ a město; vypnutí `GEOCODING_ENABLED=false`.
+- **QuestPDF** je použit pod Community licencí (zdarma pro jednotlivce a firmy s obratem do 1 mil. USD).
+- Realtime notifikace a e-mailový outbox počítají s jednou instancí API.
+- Registrace s již použitým e-mailem vrací 409 (registrace existenci účtu prozrazuje ze své podstaty; přihlášení ne).
 
 ---
 
@@ -370,13 +668,15 @@ Protection klíčů pro více instancí; E2E testy (Playwright); lokalizace do a
 | Problém | Řešení |
 |---|---|
 | `POSTGRES_PASSWORD must be set` | chybí `.env` → `scripts/init-env.ps1` |
-| API se restartuje, log „ADMIN_PASSWORD is not configured“ | doplňte `ADMIN_PASSWORD` (min. 12 znaků) do `.env`, `docker compose up -d` |
-| Kód nepřichází (Gmail) | `docker compose logs api` – hledejte „SMTP delivery failed“; ověřte App Password, 2FA, `SMTP_USE_STARTTLS=true`, port 587, spam |
-| Kód nepřichází (Mailpit) | běží kontejner `mailpit`? (`COMPOSE_PROFILES=mailpit`), `SMTP_HOST=mailpit` |
+| API se restartuje, log „ADMIN_PASSWORD is not configured“ | doplňte `ADMIN_PASSWORD` (min. 12 znaků) a `docker compose up -d` |
+| Nedaří se přihlásit do administrace | heslo v databázi se mění jen resetem (viz [Administrátor](#administrátor-a-dvoufázové-ověření)); po 5 chybách je účet 15 min zamčený |
+| Na serveru se po přihlášení vrací na přihlašovací stránku | server běží přes HTTP → v jeho `.env` musí být `COOKIE_SECURE=false` |
+| Kód nebo e-mail o stavu nepřichází | `docker compose logs api` → „SMTP delivery failed“; zkontrolujte heslo aplikace, port 587, spam. Stav e-mailů je i v audit logu |
+| Indikátor v administraci ukazuje „Offline“ | Nginx musí proxyovat `/hubs/` (WebSocket); obnovte stránku |
+| Klinika není na mapě | poloha se dohledává na pozadí (~1 s/klinika); adresu nemusí Nominatim najít |
+| Ztracený telefon s Authenticatorem | záložní kód, nebo reset 2FA (viz výše) |
 | „Platnost formuláře vypršela“ | obnovte stránku (nový CSRF token) |
-| Po přihlášení zpět na login při přístupu z jiného PC přes HTTP | `COOKIE_SECURE=false` (jen lokálně) nebo nasadit HTTPS |
-| Port 8080/8025 je obsazený | změňte `WEB_PORT` / `MAILPIT_UI_PORT` |
-| Testy backendu selžou na Dockeru | Testcontainers potřebuje běžící Docker Desktop |
-| Docker Desktop „unable to start“ / `read-only file system` | zkontrolujte volné místo na disku (image a build cache potřebují několik GB), poté `wsl --shutdown` a znovu spustit Docker Desktop; úklid: `docker builder prune` |
-| Změna hesla administrátora | `scripts/reset-admin.ps1` |
-| Začít s prázdnou DB | `docker compose down -v` (smaže všechna data) |
+| Testy backendu selžou na Dockeru | Testcontainers potřebuje běžící Docker |
+| Docker Desktop „unable to start“ / zaseknutý build | dojde-li místo na disku, uvolněte ho, `docker builder prune -f` a restart PC. Poškozený obraz po zaseknutém buildu: `docker compose build --no-cache api` |
+| `deploy.ps1` hlásí „Docker is not running“ | spusťte Docker Desktop |
+| Začít s prázdnou databází | `docker compose down -v` (smaže všechna data) |

@@ -1,10 +1,19 @@
-import { Building2, LayoutDashboard, LogOut } from 'lucide-react'
+import { Building2, LayoutDashboard, LogOut, Map as MapIcon, ScrollText, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
+import { AdminRealtimeProvider, RealtimeIndicator } from '../admin/AdminRealtime'
 import { useAdminSession } from '../auth/sessions'
 import { Brand } from '../components/Brand'
 import { useToast } from '../components/Toast'
 import { Spinner } from '../components/ui'
+
+const navItems = [
+  { to: '/admin', label: 'Přehled', icon: LayoutDashboard, end: true },
+  { to: '/admin/kliniky', label: 'Kliniky', icon: Building2 },
+  { to: '/admin/mapa', label: 'Mapa', icon: MapIcon },
+  { to: '/admin/audit', label: 'Audit log', icon: ScrollText },
+  { to: '/admin/zabezpeceni', label: 'Zabezpečení', icon: ShieldCheck },
+]
 
 export function AdminLayout() {
   const session = useAdminSession()
@@ -24,35 +33,39 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="admin-shell">
-      <a href="#main" className="skip-link">
-        Přeskočit na obsah
-      </a>
-      <header className="admin-topbar">
-        <div className="container admin-topbar-inner">
-          <Brand to="/admin" inverse subtitle="Administrace" />
-          <nav className="admin-nav" aria-label="Administrace">
-            <NavLink to="/admin" end>
-              <LayoutDashboard size={16} aria-hidden="true" />
-              Přehled
-            </NavLink>
-            <NavLink to="/admin/kliniky">
-              <Building2 size={16} aria-hidden="true" />
-              Kliniky
-            </NavLink>
-          </nav>
-          <div className="admin-user">
-            <span className="admin-user-name">{session.data?.username}</span>
-            <button type="button" className="btn btn-sm" onClick={logout} disabled={busy}>
-              {busy ? <Spinner /> : <LogOut size={16} aria-hidden="true" />}
-              Odhlásit
-            </button>
+    <AdminRealtimeProvider>
+      <div className="admin-shell">
+        <a href="#main" className="skip-link">
+          Přeskočit na obsah
+        </a>
+        <header className="admin-topbar">
+          <div className="container admin-topbar-inner">
+            <Brand to="/admin" inverse subtitle="Administrace" />
+            <nav className="admin-nav" aria-label="Administrace">
+              {navItems.map(({ to, label, icon: Icon, end }) => (
+                <NavLink key={to} to={to} end={end}>
+                  <Icon size={16} aria-hidden="true" />
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="admin-user">
+              <RealtimeIndicator />
+              <span className="admin-user-name">
+                {session.data?.username}
+                {session.data?.twoFactorEnabled && <ShieldCheck size={14} aria-label="Dvoufázové ověření zapnuto" style={{ marginLeft: 4, verticalAlign: '-2px' }} />}
+              </span>
+              <button type="button" className="btn btn-sm" onClick={logout} disabled={busy}>
+                {busy ? <Spinner /> : <LogOut size={16} aria-hidden="true" />}
+                Odhlásit
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
-      <main id="main" tabIndex={-1}>
-        <Outlet />
-      </main>
-    </div>
+        </header>
+        <main id="main" tabIndex={-1}>
+          <Outlet />
+        </main>
+      </div>
+    </AdminRealtimeProvider>
   )
 }

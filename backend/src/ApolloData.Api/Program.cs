@@ -20,6 +20,18 @@ if (args is ["reset-admin-password", ..])
     return await MaintenanceCommands.ResetAdminPasswordAsync(app);
 }
 
+// `dotnet ApolloData.Api.dll reset-admin-2fa`: turns off two-factor authentication of ADMIN_USERNAME (lost phone).
+if (args is ["reset-admin-2fa", ..])
+{
+    return await MaintenanceCommands.ResetAdminTwoFactorAsync(app);
+}
+
+// `dotnet ApolloData.Api.dll seed-demo-data [--remove|--reset]`: optional demo eye clinics for presentations.
+if (args is ["seed-demo-data", ..])
+{
+    return await DemoDataCommand.RunAsync(app, args);
+}
+
 try
 {
     await app.InitializeDatabaseAsync();

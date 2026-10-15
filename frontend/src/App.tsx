@@ -55,6 +55,12 @@ export const routes: RouteObject[] = [
                 path: 'kliniky/:id',
                 lazy: async () => ({ Component: (await loadChunk(() => import('./pages/admin/AdminClinicDetailPage'))).AdminClinicDetailPage }),
               },
+              { path: 'mapa', lazy: async () => ({ Component: (await loadChunk(() => import('./pages/admin/AdminMapPage'))).AdminMapPage }) },
+              { path: 'audit', lazy: async () => ({ Component: (await loadChunk(() => import('./pages/admin/AdminAuditPage'))).AdminAuditPage }) },
+              {
+                path: 'zabezpeceni',
+                lazy: async () => ({ Component: (await loadChunk(() => import('./pages/admin/AdminSecurityPage'))).AdminSecurityPage }),
+              },
             ],
           },
         ],
