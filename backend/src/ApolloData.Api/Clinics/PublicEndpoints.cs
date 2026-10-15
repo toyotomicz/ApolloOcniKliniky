@@ -2,7 +2,9 @@ using ApolloData.Api.Auth;
 using ApolloData.Api.Common;
 using ApolloData.Api.Data;
 using ApolloData.Api.Domain;
+using ApolloData.Api.Geo;
 using ApolloData.Api.Plans;
+using ApolloData.Api.Realtime;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -46,6 +48,8 @@ public static class PublicEndpoints
         ClinicOtpService otp,
         TimeProvider time,
         IOptions<AuthOptions> authOptions,
+        GeocodingSignal geocoding,
+        IAdminNotifier notifier,
         ILogger<RegistrationRequest> logger,
         CancellationToken ct)
     {
@@ -96,6 +100,8 @@ public static class PublicEndpoints
         }
 
         logger.LogInformation("Clinic {ClinicId} registered with plan {Plan}", clinic.Id, clinic.PlanCode);
+        geocoding.Notify();
+        await notifier.RegistrationCreatedAsync(new RegistrationCreatedEvent(clinic.Id, clinic.Name, clinic.PlanCode, clinic.City, clinic.CreatedAt));
 
         // The verification code is sent right away so the user can verify without leaving the form.
         // A delivery failure does not roll back the registration; the user can request a new code.

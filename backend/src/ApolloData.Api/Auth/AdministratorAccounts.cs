@@ -14,6 +14,10 @@ public enum AdminLoginResult
     Failed,
 }
 
+/// <param name="Admin">The administrator, when the password was correct.</param>
+/// <param name="FailedAdministratorId">Known account whose login failed (for the audit log); null for unknown usernames.</param>
+public sealed record AdminPasswordCheck(AdminLoginResult Result, Administrator? Admin, Guid? FailedAdministratorId, bool Locked);
+
 /// <summary>
 /// Administrator credential handling. Passwords are hashed with ASP.NET Core Identity's
 /// <see cref="PasswordHasher{TUser}"/> (PBKDF2, salted, versioned format).
@@ -115,13 +119,14 @@ public sealed class AdministratorAccounts(
         admin.FailedLoginCount = 0;
         admin.LockoutEndAt = null;
         admin.IsActive = true;
+        db.Record(ActivityEventType.AdminPasswordReset, time.GetUtcNow().UtcDateTime, administratorId: admin.Id, detail: "maintenance");
         await db.SaveChangesAsync(ct);
 
         if (!created) await sessions.RevokeAllForAdministratorAsync(admin.Id, ct);
         return created;
     }
 
-    public async Task<(AdminLoginResult Result, Administrator? Admin)> VerifyLoginAsync(string username, string password, CancellationToken ct)
+    public async Task<AdminPasswordCheck> VerifyLoginAsync(string username, string password, CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
         var normalized = Normalize(username);
@@ -132,38 +137,77 @@ public sealed class AdministratorAccounts(
             _dummyHash ??= hasher.HashPassword(DummyAdmin, Guid.NewGuid().ToString());
             hasher.VerifyHashedPassword(DummyAdmin, _dummyHash, password);
             logger.LogInformation("Administrator login failed: unknown or inactive account");
-            return (AdminLoginResult.Failed, null);
+            return new AdminPasswordCheck(AdminLoginResult.Failed, null, admin?.Id, Locked: false);
         }
 
-        if (admin.LockoutEndAt > now)
+        if (IsLockedOut(admin, now))
         {
             logger.LogWarning("Administrator login rejected: account {AdminId} locked until {LockoutEnd:o}", admin.Id, admin.LockoutEndAt);
-            return (AdminLoginResult.Failed, null);
+            return new AdminPasswordCheck(AdminLoginResult.Failed, null, admin.Id, Locked: true);
         }
 
         var verification = hasher.VerifyHashedPassword(admin, admin.PasswordHash, password);
         if (verification == PasswordVerificationResult.Failed)
         {
-            admin.FailedLoginCount++;
-            if (admin.FailedLoginCount >= options.Value.AdminMaxFailedAttempts)
-            {
-                admin.LockoutEndAt = now.AddMinutes(options.Value.AdminLockoutMinutes);
-                admin.FailedLoginCount = 0;
-                logger.LogWarning("Administrator account {AdminId} locked after repeated failed logins", admin.Id);
-            }
-            await db.SaveChangesAsync(ct);
-            return (AdminLoginResult.Failed, null);
+            var locked = await RegisterFailedAttemptAsync(admin, ct);
+            return new AdminPasswordCheck(AdminLoginResult.Failed, null, admin.Id, locked);
         }
 
         if (verification == PasswordVerificationResult.SuccessRehashNeeded)
         {
             admin.PasswordHash = hasher.HashPassword(admin, password);
+            await db.SaveChangesAsync(ct);
         }
+        return new AdminPasswordCheck(AdminLoginResult.Success, admin, null, Locked: false);
+    }
+
+    public static bool IsLockedOut(Administrator admin, DateTime now) => admin.LockoutEndAt > now;
+
+    /// <summary>Counts a failed password or second-factor attempt; locks the account after too many. Returns true when it locked.</summary>
+    public async Task<bool> RegisterFailedAttemptAsync(Administrator admin, CancellationToken ct)
+    {
+        var locked = false;
+        admin.FailedLoginCount++;
+        if (admin.FailedLoginCount >= options.Value.AdminMaxFailedAttempts)
+        {
+            admin.LockoutEndAt = time.GetUtcNow().UtcDateTime.AddMinutes(options.Value.AdminLockoutMinutes);
+            admin.FailedLoginCount = 0;
+            locked = true;
+            logger.LogWarning("Administrator account {AdminId} locked after repeated failed logins", admin.Id);
+        }
+        await db.SaveChangesAsync(ct);
+        return locked;
+    }
+
+    /// <summary>Resets failure counters after all factors passed (saved by the caller).</summary>
+    public void MarkSignedIn(Administrator admin)
+    {
         admin.FailedLoginCount = 0;
         admin.LockoutEndAt = null;
-        admin.LastLoginAt = now;
+        admin.LastLoginAt = time.GetUtcNow().UtcDateTime;
+    }
+
+    /// <summary>Maintenance: turns two-factor authentication off (lost phone) and revokes the administrator's sessions.</summary>
+    public async Task<bool> ResetTwoFactorAsync(string username, SessionService sessions, CancellationToken ct)
+    {
+        var normalized = Normalize(username);
+        var admin = await db.Administrators.FirstOrDefaultAsync(a => a.NormalizedUsername == normalized, ct);
+        if (admin is null) return false;
+        DisableTwoFactor(admin);
+        await db.AdminRecoveryCodes.Where(c => c.AdministratorId == admin.Id).ExecuteDeleteAsync(ct);
+        db.Record(ActivityEventType.AdminTwoFactorDisabled, time.GetUtcNow().UtcDateTime, administratorId: admin.Id, detail: "maintenance");
         await db.SaveChangesAsync(ct);
-        return (AdminLoginResult.Success, admin);
+        await sessions.RevokeAllForAdministratorAsync(admin.Id, ct);
+        return true;
+    }
+
+    public static void DisableTwoFactor(Administrator admin)
+    {
+        admin.TwoFactorEnabled = false;
+        admin.TwoFactorSecret = null;
+        admin.TwoFactorPendingSecret = null;
+        admin.TwoFactorEnabledAt = null;
+        admin.TwoFactorLastTimeStep = null;
     }
 
     private static void EnsurePasswordPolicy(string password)

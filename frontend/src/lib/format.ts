@@ -1,4 +1,4 @@
-import type { ActivityItem, ClinicStatus, OnboardingPreference } from '../api/types'
+import type { ActivityItem, ActivityType, AuditActor, ClinicStatus, OnboardingPreference } from '../api/types'
 
 // Dates are stored in UTC and displayed in the clinic administration's local time zone.
 const TIME_ZONE = 'Europe/Prague'
@@ -73,8 +73,82 @@ export function pluralize(count: number, one: string, few: string, many: string)
 }
 
 const statusFromDetail = (detail: string | null): string => {
-  const target = detail?.split('→')[1]?.toLowerCase() as ClinicStatus | undefined
+  // "Pending→Approved" or "Pending→Approved;bulk"
+  const target = detail?.split(';')[0]?.split('→')[1]?.toLowerCase() as ClinicStatus | undefined
   return target && target in statusLabels ? statusLabels[target].toLowerCase() : 'změněn'
+}
+
+const by = (item: { administratorUsername?: string | null }) => (item.administratorUsername ? ` (${item.administratorUsername})` : '')
+
+/** Czech names of audit events (mirrors AuditEndpoints.Labels on the server). */
+export const activityLabels: Record<ActivityType, string> = {
+  clinicRegistered: 'Registrace kliniky',
+  clinicEmailVerified: 'Ověření e-mailu',
+  clinicSignedIn: 'Přihlášení kliniky',
+  clinicSignedOut: 'Odhlášení kliniky',
+  clinicProfileUpdated: 'Úprava údajů kliniky',
+  clinicStatusChanged: 'Změna stavu registrace',
+  clinicMessageSent: 'Zpráva od kliniky',
+  confirmationDownloaded: 'Stažení potvrzení (PDF)',
+  adminNoteAdded: 'Interní poznámka',
+  adminSignedIn: 'Přihlášení administrátora',
+  adminSignedOut: 'Odhlášení administrátora',
+  adminSignInFailed: 'Neúspěšné přihlášení administrátora',
+  adminMessageSent: 'Zpráva od administrátora',
+  adminTwoFactorEnabled: 'Zapnutí dvoufázového ověření',
+  adminTwoFactorDisabled: 'Vypnutí dvoufázového ověření',
+  adminRecoveryCodesRenewed: 'Nové záložní kódy',
+  adminPasswordReset: 'Reset hesla administrátora',
+  auditLogExported: 'Export audit logu',
+  emailSent: 'Odeslaný e-mail',
+  emailFailed: 'Neodeslaný e-mail',
+  demoDataSeeded: 'Nahrání demo dat',
+  demoDataRemoved: 'Odstranění demo dat',
+}
+
+export const auditActorLabels: Record<AuditActor, string> = {
+  clinic: 'Klinika',
+  administrator: 'Administrátor',
+  system: 'Systém',
+}
+
+const emailKindLabels: Record<string, string> = {
+  StatusChanged: 'změna stavu',
+  NewMessage: 'nová zpráva',
+}
+
+/** Human-readable detail of an audit event (raw details are machine-friendly, e.g. "Pending→Approved;bulk"). */
+export function describeAuditDetail(type: ActivityType, detail: string | null): string {
+  if (!detail) return ''
+  switch (type) {
+    case 'clinicStatusChanged': {
+      const [change, flag] = detail.split(';')
+      const [from, to] = (change ?? '').split('→').map((s) => statusLabels[s?.toLowerCase() as ClinicStatus] ?? s)
+      return `${from} → ${to}${flag === 'bulk' ? ' (hromadně)' : ''}`
+    }
+    case 'clinicRegistered':
+      return `plán ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+    case 'emailSent':
+    case 'emailFailed':
+      return emailKindLabels[detail.split(';')[0] ?? ''] ?? detail
+    case 'adminSignedIn':
+      return detail === '2fa' ? 'heslo + kód z aplikace' : detail === 'recovery-code' ? 'heslo + záložní kód' : 'heslo'
+    case 'adminSignInFailed':
+      return (
+        {
+          'unknown-user': 'neznámý uživatel',
+          password: 'chybné heslo',
+          'password;locked': 'chybné heslo, účet zamčen',
+          '2fa': 'chybný kód z aplikace',
+          '2fa;locked': 'chybný kód, účet zamčen',
+          'recovery-code': 'chybný záložní kód',
+        } as Record<string, string>
+      )[detail] ?? detail
+    case 'clinicProfileUpdated':
+      return detail === 'address' ? 'včetně adresy' : detail
+    default:
+      return detail.replace('rows=', 'řádků: ').replace('clinics=', 'klinik: ').replace('maintenance', 'údržbový příkaz')
+  }
 }
 
 /** Human-readable Czech description of an activity event (clinic name is rendered separately). */
@@ -89,10 +163,22 @@ export function describeActivity(item: ActivityItem): string {
     case 'clinicProfileUpdated':
       return 'Klinika upravila své údaje'
     case 'clinicStatusChanged':
-      return `Stav: ${statusFromDetail(item.detail)}${item.administratorUsername ? ` (${item.administratorUsername})` : ''}`
+      return `Stav: ${statusFromDetail(item.detail)}${item.detail?.endsWith(';bulk') ? ', hromadně' : ''}${by(item)}`
+    case 'clinicMessageSent':
+      return 'Nová zpráva od kliniky'
+    case 'adminMessageSent':
+      return `Odpověď administrátora${by(item)}`
     case 'adminNoteAdded':
-      return `Interní poznámka${item.administratorUsername ? ` (${item.administratorUsername})` : ''}`
-    case 'adminSignedIn':
-      return 'Přihlášení administrátora'
+      return `Interní poznámka${by(item)}`
+    default:
+      return activityLabels[item.type]
   }
+}
+
+/** "3 h", "2,5 dne" – duration given in hours. */
+export function formatHours(hours: number | null | undefined): string {
+  if (hours === null || hours === undefined) return '—'
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min`
+  if (hours < 48) return `${new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 }).format(hours)} h`
+  return `${new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 1 }).format(hours / 24)} dne`
 }

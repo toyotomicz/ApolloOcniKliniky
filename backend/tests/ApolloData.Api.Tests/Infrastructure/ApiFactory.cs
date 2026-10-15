@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using ApolloData.Api.Data;
 using ApolloData.Api.Email;
+using ApolloData.Api.Geo;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
@@ -29,6 +30,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
 
     public FakeEmailSender Email { get; } = new();
+    public FakeGeocoder Geocoder { get; } = new();
     public FakeTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     protected virtual IDictionary<string, string?> ExtraSettings => new Dictionary<string, string?>();
@@ -47,6 +49,12 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:OtpRequestPermits", "1000");
         builder.UseSetting("RateLimiting:OtpVerifyPermits", "1000");
         builder.UseSetting("RateLimiting:AdminLoginPermits", "1000");
+        builder.UseSetting("RateLimiting:MessagePermits", "1000");
+        // The outbox worker runs for real (with the fake sender) and polls quickly.
+        builder.UseSetting("EmailOutbox:PollIntervalMilliseconds", "100");
+        // The background geocoder would update clinic rows concurrently with the tests (changing their
+        // concurrency version); tests drive it explicitly through GeocodingWorker.ProcessNextAsync instead.
+        builder.UseSetting("GEOCODING_ENABLED", "false");
         foreach (var (key, value) in ExtraSettings) builder.UseSetting(key, value);
 
         builder.ConfigureTestServices(services =>
@@ -55,6 +63,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton<IEmailSender>(Email);
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Time);
+            services.RemoveAll<IGeocoder>();
+            services.AddSingleton<IGeocoder>(Geocoder);
         });
     }
 
@@ -109,6 +119,10 @@ public sealed class TestClient(HttpClient http, CookieContainer cookies) : IDisp
 
     public async Task<HttpResponseMessage> PutAsync(string url, object? body) => await SendAsync(HttpMethod.Put, url, body);
 
+    /// <summary>The antiforgery token, for requests built by hand.</summary>
+    public async Task<string> CsrfTokenAsync() =>
+        _csrf ??= (await http.GetFromJsonAsync<JsonElement>("/api/security/csrf")).GetProperty("token").GetString()!;
+
     public async Task<T> GetJsonAsync<T>(string url)
     {
         var response = await http.GetAsync(url);
@@ -148,14 +162,40 @@ public sealed partial class FakeEmailSender : IEmailSender
 
     public string? LastCodeFor(string email)
     {
-        var message = Sent.LastOrDefault(m => string.Equals(m.ToEmail, email, StringComparison.OrdinalIgnoreCase));
+        var message = Sent.LastOrDefault(m => string.Equals(m.ToEmail, email, StringComparison.OrdinalIgnoreCase)
+                                              && m.Subject.Contains("přihlašovací kód", StringComparison.Ordinal));
         return message is null ? null : CodePattern().Match(message.TextBody).Value;
+    }
+
+    /// <summary>Waits for an email delivered asynchronously (by the outbox worker).</summary>
+    public async Task<EmailMessage> WaitForAsync(Func<EmailMessage, bool> predicate, int timeoutMs = 10_000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (Sent.FirstOrDefault(predicate) is { } message) return message;
+            await Task.Delay(50);
+        }
+        throw new TimeoutException("Expected email was not sent in time.");
     }
 
     public int CountFor(string email) => Sent.Count(m => string.Equals(m.ToEmail, email, StringComparison.OrdinalIgnoreCase));
 
     [GeneratedRegex(@"\b\d{6}\b")]
     private static partial Regex CodePattern();
+}
+
+/// <summary>Resolves every address to a fixed point unless told otherwise; never calls the network.</summary>
+public sealed class FakeGeocoder : IGeocoder
+{
+    public GeoPoint? Result { get; set; } = new(49.7475, 13.3776);
+    public int Calls { get; private set; }
+
+    public Task<GeoPoint?> GeocodeAsync(string street, string postalCode, string city, CancellationToken ct)
+    {
+        Calls++;
+        return Task.FromResult(Result);
+    }
 }
 
 public static class HttpAssertions

@@ -13,6 +13,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ClinicStatusChange> ClinicStatusChanges => Set<ClinicStatusChange>();
     public DbSet<AdminNote> AdminNotes => Set<AdminNote>();
     public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
+    public DbSet<ClinicMessage> ClinicMessages => Set<ClinicMessage>();
+    public DbSet<OutboundEmail> OutboundEmails => Set<OutboundEmail>();
+    public DbSet<AdminRecoveryCode> AdminRecoveryCodes => Set<AdminRecoveryCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
@@ -24,6 +27,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         configurationBuilder.Properties<SessionKind>().HaveConversion<string>().HaveMaxLength(16);
         configurationBuilder.Properties<ActivityEventType>().HaveConversion<string>().HaveMaxLength(32);
         configurationBuilder.Properties<OnboardingPreference>().HaveConversion<string>().HaveMaxLength(16);
+        configurationBuilder.Properties<MessageSender>().HaveConversion<string>().HaveMaxLength(16);
+        configurationBuilder.Properties<OutboundEmailKind>().HaveConversion<string>().HaveMaxLength(32);
     }
 }
 

@@ -176,7 +176,7 @@
 
 /* ---------- Generic page scaffolding ---------- */
 .page {
-  padding: var(--space-7) 0 var(--space-8);
+  padding-block: var(--space-7) var(--space-8);
 }
 .page-narrow {
   max-width: 760px;

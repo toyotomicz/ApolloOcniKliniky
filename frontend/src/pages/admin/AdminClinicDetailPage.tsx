@@ -1,12 +1,15 @@
-import { ArrowLeft, CircleCheck, CircleX, NotebookPen, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { ArrowLeft, CircleCheck, CircleX, FileDown, MessageSquare, NotebookPen, RotateCcw, ScrollText } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { adminApi } from '../../api/endpoints'
 import type { AdminClinicDetail, ClinicStatus } from '../../api/types'
+import { useRealtimeEvents } from '../../admin/realtime'
 import { useAdminSession } from '../../auth/sessions'
 import { ClinicDetails, PlanSummary } from '../../components/ClinicDetails'
+import { ClinicMap } from '../../components/ClinicMap'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { MessageThread } from '../../components/MessageThread'
 import { useToast } from '../../components/Toast'
 import { Alert, DefinitionList, EmptyState, Field, LoadingBlock, Spinner, StatusBadge } from '../../components/ui'
 import { formatDateTime, statusActionLabels, statusLabels } from '../../lib/format'
@@ -21,6 +24,11 @@ const actionStyle: Record<ClinicStatus, { variant: 'success' | 'danger-solid' | 
 export function AdminClinicDetailPage() {
   const { id = '' } = useParams()
   const { data, setData, error, loading, reload } = useAdminLoader(() => adminApi.clinic(id), [id])
+
+  // Another administrator (or the clinic itself) changed this clinic: show the current data.
+  useRealtimeEvents((event) => {
+    if (event.type === 'clinicsChanged' && event.clinicIds.includes(id)) void reload()
+  })
 
   return (
     <div className="container page">
@@ -48,6 +56,13 @@ function ClinicDetailView({
   onReload: () => Promise<void>
 }) {
   const clinic = detail.profile
+  const mapPoints = useMemo(
+    () =>
+      detail.location
+        ? [{ id: clinic.id, name: clinic.name, city: clinic.city, status: clinic.status, latitude: detail.location.latitude, longitude: detail.location.longitude }]
+        : [],
+    [detail.location, clinic.id, clinic.name, clinic.city, clinic.status],
+  )
   return (
     <>
       <div className="page-header">
@@ -55,14 +70,24 @@ function ClinicDetailView({
           <h1>{clinic.name}</h1>
           <p>
             Plán {clinic.plan.name} · registrováno {formatDateTime(clinic.createdAt)}
+            {detail.isDemo && <span className="badge" style={{ marginLeft: 8 }}>Demo data</span>}
           </p>
         </div>
-        <StatusBadge status={clinic.status} />
+        <div className="inline-actions">
+          <StatusBadge status={clinic.status} />
+          <a className="btn btn-sm" href={adminApi.confirmationUrl(clinic.id)} download>
+            <FileDown size={16} aria-hidden="true" /> Potvrzení (PDF)
+          </a>
+          <Link className="btn btn-sm" to={`/admin/audit?clinicId=${clinic.id}`}>
+            <ScrollText size={16} aria-hidden="true" /> Audit
+          </Link>
+        </div>
       </div>
 
       <div className="portal-grid">
         <div className="stack">
           <ClinicDetails clinic={clinic} />
+          <MessagesPanel clinicId={clinic.id} />
           <StatusHistory detail={detail} />
         </div>
         <aside className="stack" aria-label="Administrace kliniky">
@@ -83,6 +108,20 @@ function ClinicDetailView({
             </div>
           </section>
           <NotesPanel detail={detail} onChange={onChange} />
+          <section className="card" aria-labelledby="location-title">
+            <div className="card-header">
+              <h2 id="location-title">Poloha</h2>
+            </div>
+            {mapPoints.length > 0 ? (
+              <ClinicMap points={mapPoints} label={`Poloha kliniky ${clinic.name}`} height={220} singleZoom={14} />
+            ) : (
+              <div className="card-body">
+                <p className="muted small" style={{ margin: 0 }}>
+                  Poloha zatím není určena. Adresa se dohledává automaticky na pozadí.
+                </p>
+              </div>
+            )}
+          </section>
           <PlanSummary clinic={clinic} />
         </aside>
       </div>
@@ -202,6 +241,45 @@ function DecisionPanel({ detail, onChange, onReload }: { detail: AdminClinicDeta
           </Field>
         </div>
       </ConfirmDialog>
+    </section>
+  )
+}
+
+function MessagesPanel({ clinicId }: { clinicId: string }) {
+  const session = useAdminSession()
+  const location = useLocation()
+  const { data, setData, error, loading, reload } = useAdminLoader(() => adminApi.messages(clinicId), [clinicId])
+
+  useRealtimeEvents((event) => {
+    if (event.type === 'messageReceived' && event.clinicId === clinicId) void reload()
+  })
+
+  // Links like /admin/kliniky/:id#zpravy jump straight to the conversation.
+  useEffect(() => {
+    if (location.hash === '#zpravy' && data) document.getElementById('zpravy')?.scrollIntoView({ block: 'start' })
+  }, [location.hash, data])
+
+  return (
+    <section className="card" aria-labelledby="messages-title" id="zpravy">
+      <div className="card-header">
+        <h2 id="messages-title">
+          <MessageSquare size={18} aria-hidden="true" style={{ verticalAlign: '-3px', marginRight: 6 }} />
+          Zprávy s klinikou
+        </h2>
+        <span className="small muted">Klinice přijde e-mail, že na ni čeká zpráva.</span>
+      </div>
+      <div className="card-body">
+        <MessageThread
+          viewer="administrator"
+          messages={data}
+          loading={loading}
+          error={error}
+          onSend={(body) => adminApi.sendMessage(clinicId, body)}
+          onSent={(message) => setData([...(data ?? []), message])}
+          onUnauthorized={session.markSignedOut}
+          emptyText="Napište klinice například, co je potřeba doplnit."
+        />
+      </div>
     </section>
   )
 }

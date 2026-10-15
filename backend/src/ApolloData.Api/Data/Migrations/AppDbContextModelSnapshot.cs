@@ -37,8 +37,8 @@ namespace ApolloData.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Detail")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
@@ -52,9 +52,9 @@ namespace ApolloData.Api.Data.Migrations
 
                     b.HasIndex("AdministratorId");
 
-                    b.HasIndex("ClinicId");
-
                     b.HasIndex("OccurredAt");
+
+                    b.HasIndex("ClinicId", "OccurredAt");
 
                     b.HasIndex("Type", "OccurredAt");
 
@@ -90,6 +90,33 @@ namespace ApolloData.Api.Data.Migrations
                     b.ToTable("AdminNotes");
                 });
 
+            modelBuilder.Entity("ApolloData.Api.Domain.AdminRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AdministratorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdministratorId");
+
+                    b.ToTable("AdminRecoveryCodes");
+                });
+
             modelBuilder.Entity("ApolloData.Api.Domain.Administrator", b =>
                 {
                     b.Property<Guid>("Id")
@@ -120,6 +147,23 @@ namespace ApolloData.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("TwoFactorEnabledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("TwoFactorLastTimeStep")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("TwoFactorPendingSecret")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -165,6 +209,18 @@ namespace ApolloData.Api.Data.Migrations
 
                     b.Property<DateTime?>("EmailVerifiedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("GeocodedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDemo")
+                        .HasColumnType("boolean");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -233,6 +289,8 @@ namespace ApolloData.Api.Data.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("IsDemo");
+
                     b.HasIndex("NormalizedEmail")
                         .IsUnique();
 
@@ -284,6 +342,48 @@ namespace ApolloData.Api.Data.Migrations
                     b.ToTable("ClinicLoginChallenges");
                 });
 
+            modelBuilder.Entity("ApolloData.Api.Domain.ClinicMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AdministratorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sender")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdministratorId");
+
+                    b.HasIndex("ClinicId", "CreatedAt");
+
+                    b.HasIndex("Sender", "ReadAt");
+
+                    b.ToTable("ClinicMessages", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicMessages_Author", "(\"Sender\" = 'Clinic' AND \"AdministratorId\" IS NULL) OR (\"Sender\" = 'Administrator' AND \"AdministratorId\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("ApolloData.Api.Domain.ClinicStatusChange", b =>
                 {
                     b.Property<Guid>("Id")
@@ -320,6 +420,71 @@ namespace ApolloData.Api.Data.Migrations
                     b.HasIndex("ClinicId", "ChangedAt");
 
                     b.ToTable("ClinicStatusChanges");
+                });
+
+            modelBuilder.Entity("ApolloData.Api.Domain.OutboundEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ClinicId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HtmlBody")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("TextBody")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ToEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<string>("ToName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasFilter("\"SentAt\" IS NULL AND \"FailedAt\" IS NULL");
+
+                    b.ToTable("OutboundEmails");
                 });
 
             modelBuilder.Entity("ApolloData.Api.Domain.UserSession", b =>
@@ -392,6 +557,15 @@ namespace ApolloData.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Administrator");
+                });
+
+            modelBuilder.Entity("ApolloData.Api.Domain.AdminRecoveryCode", b =>
+                {
+                    b.HasOne("ApolloData.Api.Domain.Administrator", null)
+                        .WithMany()
+                        .HasForeignKey("AdministratorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ApolloData.Api.Domain.Clinic", b =>
@@ -475,6 +649,22 @@ namespace ApolloData.Api.Data.Migrations
                     b.Navigation("Clinic");
                 });
 
+            modelBuilder.Entity("ApolloData.Api.Domain.ClinicMessage", b =>
+                {
+                    b.HasOne("ApolloData.Api.Domain.Administrator", "Administrator")
+                        .WithMany()
+                        .HasForeignKey("AdministratorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ApolloData.Api.Domain.Clinic", null)
+                        .WithMany("Messages")
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Administrator");
+                });
+
             modelBuilder.Entity("ApolloData.Api.Domain.ClinicStatusChange", b =>
                 {
                     b.HasOne("ApolloData.Api.Domain.Administrator", "Administrator")
@@ -492,6 +682,14 @@ namespace ApolloData.Api.Data.Migrations
                     b.Navigation("Administrator");
                 });
 
+            modelBuilder.Entity("ApolloData.Api.Domain.OutboundEmail", b =>
+                {
+                    b.HasOne("ApolloData.Api.Domain.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("ApolloData.Api.Domain.UserSession", b =>
                 {
                     b.HasOne("ApolloData.Api.Domain.Administrator", null)
@@ -507,6 +705,8 @@ namespace ApolloData.Api.Data.Migrations
 
             modelBuilder.Entity("ApolloData.Api.Domain.Clinic", b =>
                 {
+                    b.Navigation("Messages");
+
                     b.Navigation("Notes");
 
                     b.Navigation("StatusChanges");

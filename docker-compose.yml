@@ -37,6 +37,11 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-ApolloData}
       SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-true}
       OTP_HASH_KEY: ${OTP_HASH_KEY:-}
+      # Public address of the web app, used for links in notification emails.
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8080}
+      # Map: clinic addresses are resolved to coordinates with OpenStreetMap Nominatim.
+      GEOCODING_ENABLED: ${GEOCODING_ENABLED:-true}
+      GEOCODING_CONTACT_EMAIL: ${GEOCODING_CONTACT_EMAIL:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       REPORTING_TIME_ZONE: ${REPORTING_TIME_ZONE:-Europe/Prague}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
@@ -59,19 +64,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks: [frontend]
-
-  # Local email catcher – start with:  docker compose --profile mailpit up --build
-  # (or set COMPOSE_PROFILES=mailpit in .env). Web UI: http://localhost:8025
-  mailpit:
-    image: axllent/mailpit:v1.31
-    profiles: [mailpit]
-    environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: "1"
-      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
-    ports:
-      - "${MAILPIT_UI_PORT:-8025}:8025"
-    restart: unless-stopped
-    networks: [backend]
 
 volumes:
   db-data:

@@ -1,5 +1,6 @@
 using ApolloData.Api.Data;
 using ApolloData.Api.Domain;
+using ApolloData.Api.Plans;
 using Microsoft.EntityFrameworkCore;
 
 namespace ApolloData.Api.Admin;
@@ -16,6 +17,9 @@ namespace ApolloData.Api.Admin;
 /// <param name="Rejected">Clinics currently in status Rejected.</param>
 /// <param name="UniqueClinicSignInsToday">Distinct clinics that completed a one-time-code sign-in today (from the activity log).</param>
 /// <param name="EmailUnverified">Clinics that have not yet verified their email address.</param>
+/// <param name="UnreadMessages">Messages from clinics that no administrator has opened yet.</param>
+/// <param name="ApprovalRatePercent">Share of approved among currently decided registrations (approved + rejected); null without decisions.</param>
+/// <param name="AverageDecisionHours">Mean time from registration to its first approve/reject decision, over decisions in the last 90 days.</param>
 public sealed record DashboardMetrics(
     int TotalClinics,
     int NewToday,
@@ -23,16 +27,27 @@ public sealed record DashboardMetrics(
     int Approved,
     int Rejected,
     int UniqueClinicSignInsToday,
-    int EmailUnverified);
+    int EmailUnverified,
+    int UnreadMessages,
+    int? ApprovalRatePercent,
+    double? AverageDecisionHours);
 
 public sealed record DailyCount(DateOnly Date, int Count);
+
+/// <summary>Registration funnel: every registration, then verified email, then approved.</summary>
+public sealed record FunnelDto(int Registered, int EmailVerified, int Approved);
+
+public sealed record PlanCountDto(string PlanCode, string PlanName, int Count);
 
 public sealed record ActivityItemDto(
     long Id, ActivityEventType Type, DateTime OccurredAt, Guid? ClinicId, string? ClinicName, string? AdministratorUsername, string? Detail);
 
 public sealed record DashboardDto(
     DashboardMetrics Metrics,
-    IReadOnlyList<DailyCount> RegistrationsLast7Days,
+    FunnelDto Funnel,
+    IReadOnlyList<PlanCountDto> Plans,
+    int SeriesDays,
+    IReadOnlyList<DailyCount> Registrations,
     IReadOnlyList<ActivityItemDto> RecentActivity,
     string TimeZone,
     DateTime GeneratedAt);
@@ -53,7 +68,8 @@ public sealed class ReportingClock(TimeProvider time, IConfiguration configurati
 
 public sealed class DashboardService(AppDbContext db, ReportingClock clock)
 {
-    public const int ChartDays = 7;
+    public static readonly int[] AllowedSeriesDays = [7, 30];
+    public const int DecisionWindowDays = 90;
 
     private static readonly ActivityEventType[] FeedTypes =
     [
@@ -61,14 +77,17 @@ public sealed class DashboardService(AppDbContext db, ReportingClock clock)
         ActivityEventType.ClinicEmailVerified,
         ActivityEventType.ClinicProfileUpdated,
         ActivityEventType.ClinicStatusChanged,
+        ActivityEventType.ClinicMessageSent,
+        ActivityEventType.AdminMessageSent,
         ActivityEventType.AdminNoteAdded,
     ];
 
-    public async Task<DashboardDto> GetAsync(CancellationToken ct)
+    public async Task<DashboardDto> GetAsync(int seriesDays, CancellationToken ct)
     {
+        if (!AllowedSeriesDays.Contains(seriesDays)) seriesDays = AllowedSeriesDays[0];
         var today = clock.Today;
         var startOfToday = clock.StartOfDayUtc(today);
-        var firstChartDay = today.AddDays(-(ChartDays - 1));
+        var firstChartDay = today.AddDays(-(seriesDays - 1));
         var chartStart = clock.StartOfDayUtc(firstChartDay);
 
         var byStatus = await db.Clinics
@@ -84,7 +103,32 @@ public sealed class DashboardService(AppDbContext db, ReportingClock clock)
             .Distinct()
             .CountAsync(ct);
 
-        // Bounded to 7 days of registrations; bucketing happens in .NET so DST-aware local days are exact.
+        var verified = await db.Clinics.CountAsync(c => c.EmailVerifiedAt != null, ct);
+        var unreadMessages = await db.ClinicMessages.CountAsync(m => m.Sender == MessageSender.Clinic && m.ReadAt == null, ct);
+
+        var byPlan = await db.Clinics
+            .GroupBy(c => c.PlanCode)
+            .Select(g => new { Plan = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Plan, x => x.Count, ct);
+        var plans = PlanCatalog.All
+            .Select(p => new PlanCountDto(p.Code, p.Name, byPlan.GetValueOrDefault(p.Code)))
+            .Concat(byPlan.Where(kv => PlanCatalog.Find(kv.Key) is null).Select(kv => new PlanCountDto(kv.Key, kv.Key, kv.Value)))
+            .ToList();
+
+        // First approve/reject decision per clinic, for decisions made in the last 90 days.
+        var decisionWindowStart = clock.UtcNow.AddDays(-DecisionWindowDays);
+        var firstDecisions = await db.ClinicStatusChanges
+            .Where(s => s.ToStatus != ClinicStatus.Pending)
+            .GroupBy(s => s.ClinicId)
+            .Select(g => new { ClinicId = g.Key, DecidedAt = g.Min(s => s.ChangedAt) })
+            .Where(d => d.DecidedAt >= decisionWindowStart)
+            .Join(db.Clinics, d => d.ClinicId, c => c.Id, (d, c) => new { d.DecidedAt, c.CreatedAt })
+            .ToListAsync(ct);
+        double? averageDecisionHours = firstDecisions.Count == 0
+            ? null
+            : Math.Round(firstDecisions.Average(d => (d.DecidedAt - d.CreatedAt).TotalHours), 1);
+
+        // Bounded to the chart window; bucketing happens in .NET so DST-aware local days are exact.
         var recentTimestamps = await db.Clinics
             .Where(c => c.CreatedAt >= chartStart)
             .Select(c => c.CreatedAt)
@@ -101,18 +145,27 @@ public sealed class DashboardService(AppDbContext db, ReportingClock clock)
                 e.Detail))
             .ToListAsync(ct);
 
+        var approved = byStatus.GetValueOrDefault(ClinicStatus.Approved);
+        var rejected = byStatus.GetValueOrDefault(ClinicStatus.Rejected);
+        var total = byStatus.Values.Sum();
         var metrics = new DashboardMetrics(
-            TotalClinics: byStatus.Values.Sum(),
+            TotalClinics: total,
             NewToday: newToday,
             PendingReview: byStatus.GetValueOrDefault(ClinicStatus.Pending),
-            Approved: byStatus.GetValueOrDefault(ClinicStatus.Approved),
-            Rejected: byStatus.GetValueOrDefault(ClinicStatus.Rejected),
+            Approved: approved,
+            Rejected: rejected,
             UniqueClinicSignInsToday: uniqueSignIns,
-            EmailUnverified: unverified);
+            EmailUnverified: unverified,
+            UnreadMessages: unreadMessages,
+            ApprovalRatePercent: approved + rejected == 0 ? null : (int)Math.Round(100.0 * approved / (approved + rejected)),
+            AverageDecisionHours: averageDecisionHours);
 
         return new DashboardDto(
             metrics,
-            BuildDailySeries(recentTimestamps, today, clock.TimeZone, ChartDays),
+            new FunnelDto(total, verified, approved),
+            plans,
+            seriesDays,
+            BuildDailySeries(recentTimestamps, today, clock.TimeZone, seriesDays),
             activity,
             clock.TimeZone.Id,
             clock.UtcNow);

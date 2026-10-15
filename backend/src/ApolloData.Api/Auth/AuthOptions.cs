@@ -47,6 +47,7 @@ public sealed class RateLimitOptions
     public int OtpRequestPermits { get; set; } = 10;
     public int OtpVerifyPermits { get; set; } = 20;
     public int AdminLoginPermits { get; set; } = 10;
+    public int MessagePermits { get; set; } = 30;
 }
 
 public static class RateLimitPolicies
@@ -55,4 +56,5 @@ public static class RateLimitPolicies
     public const string OtpRequest = "otp-request";
     public const string OtpVerify = "otp-verify";
     public const string AdminLogin = "admin-login";
+    public const string Messages = "messages";
 }

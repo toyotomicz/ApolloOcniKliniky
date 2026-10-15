@@ -2,8 +2,13 @@ using System.Security.Claims;
 using ApolloData.Api.Auth;
 using ApolloData.Api.Common;
 using ApolloData.Api.Data;
+using ApolloData.Api.Admin;
+using ApolloData.Api.Documents;
 using ApolloData.Api.Domain;
+using ApolloData.Api.Geo;
+using ApolloData.Api.Messages;
 using ApolloData.Api.Plans;
+using ApolloData.Api.Realtime;
 using Microsoft.EntityFrameworkCore;
 
 namespace ApolloData.Api.Clinics;
@@ -22,6 +27,21 @@ public static class ClinicPortalEndpoints
 
         group.MapGet("/me", GetAsync);
         group.MapPut("/me", UpdateAsync);
+        group.MapGet("/me/confirmation.pdf", ConfirmationAsync);
+        group.MapClinicMessageEndpoints();
+    }
+
+    private static async Task<IResult> ConfirmationAsync(
+        ClaimsPrincipal user, AppDbContext db, AppInfo app, ReportingClock clock, CancellationToken ct)
+    {
+        var clinicId = user.GetSubjectId();
+        var clinic = await db.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId, ct);
+        if (clinic is null) return ApiProblems.NotFound();
+
+        db.Record(ActivityEventType.ConfirmationDownloaded, clock.UtcNow, clinicId: clinic.Id);
+        await db.SaveChangesAsync(ct);
+        var pdf = ConfirmationPdf.Generate(clinic, app.Name, clock.UtcNow, clock.TimeZone);
+        return TypedResults.File(pdf, "application/pdf", ConfirmationPdf.FileName(clinic));
     }
 
     private static async Task<IResult> GetAsync(ClaimsPrincipal user, AppDbContext db, CancellationToken ct)
@@ -32,7 +52,8 @@ public static class ClinicPortalEndpoints
     }
 
     private static async Task<IResult> UpdateAsync(
-        UpdateClinicProfileRequest request, ClaimsPrincipal user, AppDbContext db, TimeProvider time, CancellationToken ct)
+        UpdateClinicProfileRequest request, ClaimsPrincipal user, AppDbContext db, TimeProvider time,
+        GeocodingSignal geocoding, IAdminNotifier notifier, CancellationToken ct)
     {
         var clinicId = user.GetSubjectId();
         var clinic = await db.Clinics.FirstOrDefaultAsync(c => c.Id == clinicId, ct);
@@ -44,6 +65,8 @@ public static class ClinicPortalEndpoints
         var (valid, errors) = ClinicValidator.ValidateProfileUpdate(request, plan);
         if (valid is null) return ApiProblems.Validation(errors);
 
+        var addressChanged = clinic.Street != valid.Street || clinic.City != valid.City || clinic.PostalCode != valid.PostalCode;
+
         // Only explicitly listed fields are copied (no over-posting of status, email, plan, ...).
         clinic.ContactFirstName = valid.ContactFirstName;
         clinic.ContactLastName = valid.ContactLastName;
@@ -54,11 +77,15 @@ public static class ClinicPortalEndpoints
         clinic.OperationalContact = valid.OperationalContact;
         clinic.ServiceConfiguration = valid.ServiceConfiguration;
 
+        if (addressChanged) clinic.ResetLocation();
+
         var now = time.GetUtcNow().UtcDateTime;
         clinic.UpdatedAt = now;
-        db.Record(ActivityEventType.ClinicProfileUpdated, now, clinicId: clinic.Id);
+        db.Record(ActivityEventType.ClinicProfileUpdated, now, clinicId: clinic.Id, detail: addressChanged ? "address" : null);
         await db.SaveChangesAsync(ct);
 
+        if (addressChanged) geocoding.Notify();
+        await notifier.ClinicsChangedAsync(new ClinicsChangedEvent([clinic.Id], "profile"));
         return TypedResults.Ok(ClinicProfileDto.From(clinic));
     }
 }
