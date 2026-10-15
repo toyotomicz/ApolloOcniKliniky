@@ -1,6 +1,6 @@
-import { ArrowLeft, CircleCheck, CircleX, FileDown, MessageSquare, NotebookPen, RotateCcw, ScrollText } from 'lucide-react'
+import { ArrowLeft, CircleCheck, CircleX, FileDown, MessageSquare, NotebookPen, RotateCcw, ScrollText, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { adminApi } from '../../api/endpoints'
 import type { AdminClinicDetail, ClinicStatus } from '../../api/types'
@@ -113,7 +113,7 @@ function ClinicDetailView({
               <h2 id="location-title">Poloha</h2>
             </div>
             {mapPoints.length > 0 ? (
-              <ClinicMap points={mapPoints} label={`Poloha kliniky ${clinic.name}`} height={220} singleZoom={14} />
+              <ClinicMap points={mapPoints} label={`Poloha kliniky ${clinic.name}`} height={220} singleZoom={14} expandable />
             ) : (
               <div className="card-body">
                 <p className="muted small" style={{ margin: 0 }}>
@@ -123,6 +123,7 @@ function ClinicDetailView({
             )}
           </section>
           <PlanSummary clinic={clinic} />
+          <DeletePanel detail={detail} />
         </aside>
       </div>
     </>
@@ -239,6 +240,66 @@ function DecisionPanel({ detail, onChange, onReload }: { detail: AdminClinicDeta
           <Field label="Interní poznámka" optional hint="Vidí pouze administrátoři.">
             {(a) => <textarea {...a} className="textarea" value={internalNote} onChange={(e) => setInternalNote(e.target.value)} maxLength={2000} />}
           </Field>
+        </div>
+      </ConfirmDialog>
+    </section>
+  )
+}
+
+function DeletePanel({ detail }: { detail: AdminClinicDetail }) {
+  const session = useAdminSession()
+  const toast = useToast()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const clinic = detail.profile
+
+  const confirm = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await adminApi.deleteClinic(clinic.id)
+      toast.show(`Klinika „${clinic.name}“ byla smazána.`)
+      navigate('/admin/kliniky', { replace: true })
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        session.markSignedOut()
+        return
+      }
+      setError(e instanceof ApiError ? e.message : 'Kliniku se nepodařilo smazat.')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card danger-zone" aria-labelledby="delete-title">
+      <div className="card-header">
+        <h2 id="delete-title">Smazání kliniky</h2>
+      </div>
+      <div className="card-body stack">
+        <p className="small muted" style={{ margin: 0 }}>
+          Trvale odstraní kliniku včetně historie, poznámek, zpráv a přihlášení. V audit logu zůstane záznam o smazání.
+        </p>
+        <button type="button" className="btn btn-danger btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setOpen(true)}>
+          <Trash2 size={16} aria-hidden="true" /> Smazat kliniku
+        </button>
+      </div>
+      <ConfirmDialog
+        open={open}
+        title="Smazat kliniku natrvalo?"
+        confirmLabel="Smazat natrvalo"
+        confirmVariant="danger-solid"
+        busy={busy}
+        onCancel={() => setOpen(false)}
+        onConfirm={() => void confirm()}
+      >
+        <div className="stack">
+          <p style={{ margin: 0 }}>
+            Klinika <strong>{clinic.name}</strong> ({clinic.email}) bude odstraněna i se všemi svými údaji, historií stavů,
+            poznámkami a zprávami. Tuto akci nelze vrátit.
+          </p>
+          {error && <Alert kind="error">{error}</Alert>}
         </div>
       </ConfirmDialog>
     </section>

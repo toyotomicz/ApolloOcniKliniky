@@ -6,6 +6,8 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Space for the scrollbar is always reserved, so switching between short and long pages does not shift the layout. */
+  scrollbar-gutter: stable;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-height) + 16px);
 }

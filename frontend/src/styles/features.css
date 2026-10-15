@@ -442,3 +442,146 @@ tr[data-selected='true'] td {
   border-radius: var(--radius);
   font-size: 1rem;
 }
+
+/* Loading indicators appear only after 200 ms, so fast loads (cached data, prefetched pages) do not flash. */
+.loading-block {
+  animation: loading-appear 0s linear 0.2s both;
+}
+@keyframes loading-appear {
+  from {
+    visibility: hidden;
+  }
+}
+
+/* ---------- Expandable map ---------- */
+.clinic-map-wrap {
+  position: relative;
+}
+.clinic-map-wrap.is-expanded {
+  position: fixed;
+  inset: 24px;
+  z-index: 1100;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 0 0 100vmax rgba(20, 23, 26, 0.55), var(--shadow-lg);
+}
+.clinic-map-wrap.is-expanded .clinic-map {
+  height: 100%;
+}
+.map-expand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+.map-expand:hover {
+  background: var(--color-bg);
+}
+.map-expand:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+@media (max-width: 600px) {
+  .clinic-map-wrap.is-expanded {
+    inset: 8px;
+  }
+}
+
+/* ---------- Dashboard tiles: two aligned rows, clickable vs. informational ---------- */
+.metric-group-title {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin: 0 0 var(--space-2);
+}
+.metric-grid.metric-grid-links {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.metric-grid.metric-grid-info {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.metric-grid.metric-grid-links,
+.metric-grid.metric-grid-info {
+  align-items: stretch;
+}
+.metric .metric-label {
+  min-height: 1.4em;
+}
+.metric .metric-label > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.metric .metric-hint {
+  margin-top: auto;
+}
+/* Clickable tiles: arrow, pointer, lift and accent border on hover/focus. */
+.metric-link {
+  position: relative;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.2s, transform 0.2s;
+}
+.metric-arrow {
+  margin-left: auto;
+  color: var(--color-subtle);
+  flex-shrink: 0;
+  transition: transform 0.2s, color 0.15s;
+}
+a.metric-link:hover,
+a.metric-link:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+a.metric-link:hover .metric-arrow,
+a.metric-link:focus-visible .metric-arrow {
+  color: var(--color-accent);
+  transform: translateX(2px);
+}
+a.metric-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Informational tiles: flat, no border or hover – nothing to click. */
+.metric-info {
+  border-radius: var(--radius-lg);
+  background: #eceef0;
+}
+.metric-info .metric-value {
+  color: var(--color-ink);
+}
+@media (max-width: 1100px) {
+  .metric-grid.metric-grid-links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .metric-grid.metric-grid-info {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .metric-grid.metric-grid-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  a.metric-link:hover,
+  a.metric-link:focus-visible {
+    transform: none;
+  }
+}

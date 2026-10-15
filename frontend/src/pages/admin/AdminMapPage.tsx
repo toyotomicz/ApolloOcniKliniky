@@ -84,7 +84,7 @@ export function AdminMapPage() {
         {loading && !data && <LoadingBlock label="Načítám mapu…" />}
         {data && (
           <div className={loading ? 'is-refreshing' : undefined}>
-            <ClinicMap points={data.items} label="Mapa registrovaných klinik" height="min(68vh, 640px)" onOpen={open} />
+            <ClinicMap points={data.items} label="Mapa registrovaných klinik" height="min(68vh, 640px)" onOpen={open} expandable />
             {data.withoutLocation > 0 && (
               <p className="small muted map-note">
                 <MapPinOff size={14} aria-hidden="true" /> {data.withoutLocation}{' '}

@@ -149,6 +149,7 @@ export type ActivityType =
   | 'emailFailed'
   | 'demoDataSeeded'
   | 'demoDataRemoved'
+  | 'clinicDeleted'
 
 export interface ActivityItem {
   id: number
@@ -237,6 +238,11 @@ export interface Message {
   createdAt: string
   /** When the recipient first read it, as it was before this request marked anything read. */
   readAt: string | null
+}
+
+export interface BulkDeleteResult {
+  deleted: string[]
+  notFound: string[]
 }
 
 export interface BulkStatusResult {
