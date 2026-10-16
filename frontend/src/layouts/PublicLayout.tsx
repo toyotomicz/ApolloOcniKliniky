@@ -33,7 +33,8 @@ export function SiteHeader() {
             if ((event.target as HTMLElement).closest('a')) setOpen(false)
           }}
         >
-          <Link to="/#plany">Plány</Link>
+          <Link to="/#postup">Jak to funguje</Link>
+          <Link to="/#plany">Úrovně</Link>
           <Link to="/prihlaseni">Přihlášení</Link>
           <Link to="/registrace" className="btn btn-primary">
             Registrovat kliniku
@@ -61,7 +62,10 @@ export function SiteFooter() {
             <h2>Pro kliniky</h2>
             <ul>
               <li>
-                <Link to="/#plany">Plány</Link>
+                <Link to="/#postup">Jak to funguje</Link>
+              </li>
+              <li>
+                <Link to="/#plany">Úrovně registrace</Link>
               </li>
               <li>
                 <Link to="/registrace">Registrace</Link>

@@ -265,3 +265,105 @@
   color: var(--color-accent);
   flex-shrink: 0;
 }
+
+/* ---------- How it works: four numbered steps on a connecting line ---------- */
+.steps-section .section-head {
+  margin-bottom: var(--space-6);
+}
+.steps {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-5);
+  counter-reset: step;
+}
+/* Thin line linking the step numbers (desktop). */
+.steps::before {
+  content: '';
+  position: absolute;
+  top: 46px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-accent-soft), #e8b4af 20%, #e8b4af 80%, var(--color-accent-soft));
+}
+.step-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s, border-color 0.2s;
+}
+.step-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-border-strong);
+}
+.step-number {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-4);
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  /* White ring so the connecting line stops cleanly at the badge. */
+  box-shadow: 0 0 0 6px var(--color-surface), 0 6px 14px rgba(201, 58, 50, 0.3);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.step-card:hover .step-number {
+  transform: scale(1.08);
+}
+.step-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  line-height: 1.35;
+  color: var(--color-ink-strong);
+  margin-bottom: var(--space-2);
+}
+.step-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--color-muted);
+}
+.step-card[data-reveal='hidden'] {
+  opacity: 0;
+}
+.step-card[data-reveal='shown'] {
+  animation: reveal-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0s) backwards;
+}
+@media (max-width: 960px) {
+  .steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .steps::before {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-card:hover,
+  .step-card:hover .step-number {
+    transform: none;
+  }
+}
