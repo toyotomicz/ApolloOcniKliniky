@@ -4,12 +4,18 @@ export type ClinicStatus = 'pending' | 'approved' | 'rejected'
 export type OnboardingPreference = 'online' | 'onSite'
 export type FieldGroup = 'operationalContact' | 'serviceConfiguration'
 
+export interface PlanFeature {
+  text: string
+  /** false = shown as "not part of this level" */
+  included: boolean
+}
+
 export interface Plan {
   code: string
   name: string
   tagline: string
   description: string
-  features: string[]
+  features: PlanFeature[]
   fieldGroups: FieldGroup[]
   highlighted: boolean
   badge: string | null

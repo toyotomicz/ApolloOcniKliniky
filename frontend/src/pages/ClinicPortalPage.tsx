@@ -135,7 +135,7 @@ export function ClinicPortalPage() {
           <span className="eyebrow">Portál kliniky</span>
           <h1>{clinic.name}</h1>
           <p>
-            Plán {clinic.plan.name} · registrováno {formatDateTime(clinic.createdAt)}
+            {clinic.plan.name} · registrováno {formatDateTime(clinic.createdAt)}
           </p>
         </div>
         <div className="inline-actions">

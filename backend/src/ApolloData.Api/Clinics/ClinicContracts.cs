@@ -213,7 +213,7 @@ public sealed record ClinicProfileDto(
         var plan = PlanCatalog.Find(clinic.PlanCode);
         var planDto = plan is null
             ? new PlanSummaryDto(clinic.PlanCode, clinic.PlanCode, "", [])
-            : new PlanSummaryDto(plan.Code, plan.Name, plan.Tagline, plan.Features);
+            : new PlanSummaryDto(plan.Code, plan.Name, plan.Tagline, plan.Features.Where(f => f.Included).Select(f => f.Text).ToList());
 
         return new ClinicProfileDto(
             clinic.Id, clinic.Name, clinic.OrganizationId,

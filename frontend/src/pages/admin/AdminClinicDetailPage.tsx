@@ -69,7 +69,7 @@ function ClinicDetailView({
         <div>
           <h1>{clinic.name}</h1>
           <p>
-            Plán {clinic.plan.name} · registrováno {formatDateTime(clinic.createdAt)}
+            {clinic.plan.name} · registrováno {formatDateTime(clinic.createdAt)}
             {detail.isDemo && <span className="badge" style={{ marginLeft: 8 }}>Demo data</span>}
           </p>
         </div>

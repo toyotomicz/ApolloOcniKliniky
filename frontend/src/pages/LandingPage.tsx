@@ -35,7 +35,7 @@ export function LandingPage() {
       <section id="plany" className="section section-alt" aria-labelledby="plans-title">
         <div className="container">
           <div className="section-head section-head-center">
-            <h2 id="plans-title">Plány</h2>
+            <h2 id="plans-title">Úrovně registrace</h2>
           </div>
 
           {error && (
@@ -57,9 +57,9 @@ export function LandingPage() {
                     <Link
                       to={`/registrace?plan=${plan.code}`}
                       className={`btn btn-block ${plan.highlighted ? 'btn-primary' : 'btn-dark'}`}
-                      aria-label={`Zvolit plán ${plan.name} a pokračovat k registraci`}
+                      aria-label={`Zvolit ${plan.name.toLowerCase()} a pokračovat k registraci`}
                     >
-                      Zvolit {plan.name}
+                      Zvolit {plan.name.toLowerCase()}
                       <ArrowRight size={16} aria-hidden="true" />
                     </Link>
                   }

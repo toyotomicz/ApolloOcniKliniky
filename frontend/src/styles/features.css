@@ -585,3 +585,12 @@ a.metric-link:focus-visible {
     transform: none;
   }
 }
+
+/* Plan comparison: rows that are not part of a level. */
+.feature-list li.feature-excluded {
+  color: var(--color-subtle);
+}
+.feature-list li.feature-excluded svg {
+  color: var(--color-danger);
+  opacity: 0.75;
+}

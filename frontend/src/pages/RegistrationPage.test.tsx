@@ -27,7 +27,7 @@ describe('Registration wizard', () => {
     // Plan preselected from the URL → starts on the clinic step; Standard adds a 4th step.
     expect(await screen.findByRole('heading', { name: 'Klinika a kontakt' })).toBeInTheDocument()
     expect(screen.getByText('Krok 2 z 4: Klinika a kontakt')).toBeInTheDocument()
-    expect(screen.getByText('Vybraný plán: Standard')).toBeInTheDocument()
+    expect(screen.getByText('Vybraná: Standard')).toBeInTheDocument()
 
     // Empty step cannot be submitted.
     await user.click(screen.getByRole('button', { name: /Pokračovat/ }))

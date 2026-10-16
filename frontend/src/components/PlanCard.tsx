@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { FieldGroup, Plan } from '../api/types'
 
@@ -34,9 +34,12 @@ export function PlanCard({ plan, selected = false, action, headingLevel: Heading
       <p className="plan-description">{plan.description}</p>
       <ul className="feature-list">
         {plan.features.map((feature) => (
-          <li key={feature}>
-            <Check size={16} aria-hidden="true" />
-            <span>{feature}</span>
+          <li key={feature.text} className={feature.included ? undefined : 'feature-excluded'}>
+            {feature.included ? <Check size={16} aria-hidden="true" /> : <X size={16} aria-hidden="true" />}
+            <span>
+              {!feature.included && <span className="visually-hidden">Není součástí: </span>}
+              {feature.text}
+            </span>
           </li>
         ))}
       </ul>

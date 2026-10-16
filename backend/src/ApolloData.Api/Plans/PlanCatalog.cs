@@ -10,12 +10,15 @@ public static class PlanFieldGroups
     public const string ServiceConfiguration = "serviceConfiguration";
 }
 
+/// <summary>One row of the plan comparison; <see cref="Included"/> false is shown as "not part of this level".</summary>
+public sealed record PlanFeature(string Text, bool Included = true);
+
 public sealed record PlanDefinition(
     string Code,
     string Name,
     string Tagline,
     string Description,
-    IReadOnlyList<string> Features,
+    IReadOnlyList<PlanFeature> Features,
     IReadOnlyList<string> FieldGroups,
     bool Highlighted,
     string? Badge)
@@ -24,13 +27,10 @@ public sealed record PlanDefinition(
 }
 
 /// <summary>
-/// Single source of truth for registration plans. The frontend renders plan cards and
-/// plan-specific registration steps from <c>GET /api/plans</c>, and the backend validates against it.
-/// <para>
-/// PROVISIONAL CONTENT: plan names, descriptions and features were not specified by the assignment.
-/// They describe what the demo application actually does and contain no prices or commercial promises.
-/// Edit this file to change them.
-/// </para>
+/// Single source of truth for the registration levels. The frontend renders plan cards and level-specific
+/// registration steps from <c>GET /api/plans</c>, and the backend validates against it.
+/// Texts (names, prices, features) come from the business specification; the codes basic/standard/premium are
+/// internal identifiers stored with each clinic and must not change.
 /// </summary>
 public static class PlanCatalog
 {
@@ -42,44 +42,48 @@ public static class PlanCatalog
     [
         new(
             Code: Basic,
-            Name: "Basic",
-            Tagline: "Základní registrace oční ambulance",
-            Description: "Pro oční ambulance s jedním pracovištěm, které potřebují evidovat základní údaje a kontaktní osobu.",
+            Name: "Úroveň 1",
+            Tagline: "Úplně zdarma, pouze kontaktní informace",
+            Description: "Zcela zdarma",
             Features:
             [
-                "Registrace oční kliniky a kontaktní osoby",
-                "Přihlášení jednorázovým kódem z e-mailu",
-                "Přehled registrace v portálu kliniky",
-                "Úprava kontaktních údajů",
+                new("Cena: Zcela zdarma"),
+                new("Funkce: Zobrazení zařízení v seznamu partnerů včetně telefonu, e-mailu a webu"),
+                new("Přímá rezervace v aplikaci: Není dostupná", Included: false),
+                new("Nastavení kapacity: Není součástí", Included: false),
+                new("Možnosti zprovoznění konektivity: Není součástí", Included: false),
             ],
             FieldGroups: [],
             Highlighted: false,
             Badge: null),
         new(
             Code: Standard,
-            Name: "Standard",
-            Tagline: "Registrace s provozním kontaktem",
-            Description: "Pro oční kliniky, které mají vyhrazenou osobu pro provozní komunikaci.",
+            Name: "Úroveň 2",
+            Tagline: "Offline rezervační requesty s výsledkem testu",
+            Description: "50 Kč za každý zaslaný požadavek, prvních 5 požadavků za měsíc zdarma",
             Features:
             [
-                "Vše z plánu Basic",
-                "Samostatný provozní kontakt",
-                "Provozní kontakt viditelný v přehledu kliniky",
+                new("Cena: 50 Kč za každý zaslaný požadavek, prvních 5 požadavků za měsíc zdarma"),
+                new("Funkce: Pojištěnec odešle požadavek na zpětné kontaktování včetně výsledků orientačních testů"),
+                new("Přímá rezervace v aplikaci: Není dostupná", Included: false),
+                new("Nastavení kapacity: Možnost průběžně nastavovat maximální počet přijatých požadavků"),
+                new("Možnosti zprovoznění konektivity: Není součástí", Included: false),
             ],
             FieldGroups: [PlanFieldGroups.OperationalContact],
-            Highlighted: true,
-            Badge: "Doporučený"),
+            Highlighted: false,
+            Badge: null),
         new(
             Code: Premium,
-            Name: "Premium",
-            Tagline: "Registrace s konfigurací služby",
-            Description: "Pro oční centra s více pracovišti a vlastním technickým kontaktem.",
+            Name: "Úroveň 3",
+            Tagline: "Online rezervace + pokročilé integrační varianty",
+            Description: "100 Kč za každou úspěšně provedenou a API potvrzenou rezervaci",
             Features:
             [
-                "Vše z plánu Standard",
-                "Konfigurace podle počtu pracovišť",
-                "Volba formy úvodního nastavení (online / na místě)",
-                "Technický kontakt pro správu IT",
+                new("Cena: 100 Kč za každou úspěšně provedenou a API potvrzenou rezervaci"),
+                new("Funkce: Pojištěnec si vybere volný slot přímo ve vašem kalendáři"),
+                new("Přímá rezervace v aplikaci: Dostupná přes API integraci"),
+                new("Nastavení kapacity: Řídí váš rezervační systém"),
+                new("Možnosti zprovoznění konektivity: Standardní dle technické dokumentace nebo individuální úprava komunikačního rozhraní"),
             ],
             FieldGroups: [PlanFieldGroups.OperationalContact, PlanFieldGroups.ServiceConfiguration],
             Highlighted: false,
