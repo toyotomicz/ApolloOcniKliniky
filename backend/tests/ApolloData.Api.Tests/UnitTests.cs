@@ -140,6 +140,53 @@ public sealed class UnitTests
         Assert.Equal(expected, ApolloData.Api.Documents.ConfirmationPdf.FormatPhone(stored));
 
     [Fact]
+    public void Website_is_validated_and_normalized_to_https()
+    {
+        var errors = new ValidationErrors();
+        Assert.Equal("https://www.klinika.cz", Rules.Website(errors, "website", " www.klinika.cz "));
+        Assert.Equal("http://klinika.cz/objednani", Rules.Website(errors, "website", "http://klinika.cz/objednani"));
+        Assert.Null(Rules.Website(errors, "website", ""));
+        Assert.True(errors.IsValid);
+
+        foreach (var invalid in new[] { "javascript:alert(1)", "ftp://klinika.cz", "neplatny web", "localhost" })
+        {
+            var e = new ValidationErrors();
+            Assert.Null(Rules.Website(e, "website", invalid));
+            Assert.True(e.Has("website"), invalid);
+        }
+    }
+
+    [Fact]
+    public void Confirmation_pdf_of_a_fully_filled_registration_fits_on_one_page()
+    {
+        var now = new DateTime(2026, 10, 16, 8, 0, 0, DateTimeKind.Utc);
+        var clinic = new ApolloData.Api.Domain.Clinic
+        {
+            Id = Guid.CreateVersion7(), Name = "Oční centrum s dlouhým názvem Plzeň-Bory", OrganizationId = "25596641",
+            ContactFirstName = "Jana", ContactLastName = "Nováková", Email = "jana@example.test", NormalizedEmail = "jana@example.test",
+            Phone = "+420777123456", Street = "Americká 42", City = "Plzeň", PostalCode = "301 00", PlanCode = "premium",
+            PublicPhones = ["+420377123456", "+420377123457", "+420377123458"],
+            PublicEmails = ["objednavky@example.test", "recepce@example.test"],
+            Website = "https://www.ocni-centrum.example", PatientInfo = "Objednávky po–pá 7:00–15:00, ve středu do 17:00.",
+            OperationalContact = new() { Name = "Petr Svoboda", Email = "provoz@example.test", Phone = "+420377123459" },
+            ServiceConfiguration = new()
+            {
+                WorkplaceCount = 4, OnboardingPreference = ApolloData.Api.Domain.OnboardingPreference.OnSite,
+                TechnicalContactEmail = "it@example.test", Notes = "Poznámka",
+            },
+            CreatedAt = now, UpdatedAt = now, EmailVerifiedAt = now, AuthorityConfirmedAt = now,
+            PrivacyNoticeAcceptedAt = now, PrivacyNoticeVersion = "2026-10-demo",
+        };
+        QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
+        var pdf = ApolloData.Api.Documents.ConfirmationPdf.Generate(clinic, "ApolloData", now, TimeZoneInfo.Utc);
+
+        // Page objects are written as "/Type /Page" (the page tree itself is "/Type /Pages").
+        var pages = System.Text.RegularExpressions.Regex.Matches(System.Text.Encoding.Latin1.GetString(pdf), @"/Type\s*/Page(?!s)").Count;
+        Assert.Equal(1, pages);
+    }
+
+    [Fact]
     public void Csv_status_details_are_readable()
     {
         Assert.Equal("Čeká na posouzení → Schváleno (hromadně)",

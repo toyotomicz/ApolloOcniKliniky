@@ -156,12 +156,12 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
 
   /** Sends a registration code to the entered address. Returns false when the user has to fix something first. */
   const sendCode = async (): Promise<boolean> => {
-    const { email, contactFirstName, contactLastName } = form.getValues()
+    const email = form.getValues('email')
     setSendingCode(true)
     setStepError(null)
     setCodeError(null)
     try {
-      const response = await publicApi.sendRegistrationCode(email.trim(), `${contactFirstName} ${contactLastName}`.trim())
+      const response = await publicApi.sendRegistrationCode(email.trim())
       setVerification((v) => ({ ...v, codeEmail: normalizeEmail(email), resendAt: Date.now() + response.resendAfterSeconds * 1000 }))
       setCodeNotice(null)
       return true

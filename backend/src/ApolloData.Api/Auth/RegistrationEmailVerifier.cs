@@ -30,7 +30,11 @@ public sealed class RegistrationEmailVerifier(
 
     private AuthOptions Options => authOptions.Value;
 
-    public async Task<CodeIssueResult> IssueAsync(string email, string? recipientName, CancellationToken ct)
+    /// <remarks>
+    /// The endpoint is public and the address is not verified yet, so the e-mail carries no text supplied by the
+    /// caller (no name): it cannot be abused to send arbitrary content to third parties.
+    /// </remarks>
+    public async Task<CodeIssueResult> IssueAsync(string email, CancellationToken ct)
     {
         var normalized = Rules.NormalizeEmail(email);
         var now = time.GetUtcNow().UtcDateTime;
@@ -63,7 +67,7 @@ public sealed class RegistrationEmailVerifier(
         try
         {
             await emailSender.SendAsync(
-                EmailTemplates.RegistrationCode(app.Name, email.Trim(), recipientName, code, Options.OtpLifetimeMinutes), ct);
+                EmailTemplates.RegistrationCode(app.Name, email.Trim(), code, Options.OtpLifetimeMinutes), ct);
         }
         catch (EmailDeliveryException)
         {

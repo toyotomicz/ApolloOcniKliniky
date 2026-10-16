@@ -105,7 +105,10 @@ export function ClinicMap({ points, label, height = 480, onOpen, singleZoom = 14
         popup.append(button)
       }
       marker.bindPopup(popup)
-      marker.bindTooltip(point.name, { direction: 'top', offset: [0, -8] })
+      // Leaflet renders string content as HTML; clinic names come from public registrations, so pass an element.
+      const label = document.createElement('span')
+      label.textContent = point.name
+      marker.bindTooltip(label, { direction: 'top', offset: [0, -8] })
       layer.addLayer(marker)
     }
 

@@ -95,7 +95,7 @@ public static class AuditEndpoints
         var (events, errors) = Filter(db, query, clock);
         if (events is null) return ApiProblems.Validation(errors);
 
-        var page = Math.Max(1, query.Page ?? 1);
+        var page = Math.Clamp(query.Page ?? 1, 1, AdminEndpoints.MaxPage);
         var pageSize = Math.Clamp(query.PageSize ?? 50, 1, 200);
         var total = await events.CountAsync(ct);
         var items = await LoadAsync(events.Skip((page - 1) * pageSize).Take(pageSize), ct);

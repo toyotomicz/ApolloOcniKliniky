@@ -40,7 +40,7 @@ public static class EmailTemplates
     }
 
     /// <summary>Verifies the e-mail address at the start of a registration (before the clinic exists).</summary>
-    public static EmailMessage RegistrationCode(string appName, string toEmail, string? recipientName, string code, int validMinutes)
+    public static EmailMessage RegistrationCode(string appName, string toEmail, string code, int validMinutes)
     {
         var subject = $"{appName}: ověřovací kód pro registraci";
         var text =
@@ -59,14 +59,14 @@ public static class EmailTemplates
 
         var body =
             $"""
-            <p style="margin:0 0 16px;">{Greeting(recipientName)}</p>
+            <p style="margin:0 0 16px;">Dobrý den,</p>
             <p style="margin:0 0 16px;">pro pokračování v registraci kliniky zadejte tento ověřovací kód:</p>
             <p style="margin:0 0 20px;font-size:32px;font-weight:700;letter-spacing:.3em;font-family:Consolas,monospace;">{code}</p>
             <p style="margin:0 0 8px;color:#5c6670;font-size:14px;">Kód je platný {validMinutes} minut a lze jej použít pouze jednou.</p>
             <p style="margin:0;color:#5c6670;font-size:14px;">Pokud jste registraci nezačali, tento e-mail ignorujte.</p>
             """;
 
-        return new EmailMessage(toEmail, recipientName, subject, text, Layout(appName, "Ověření e-mailu", body));
+        return new EmailMessage(toEmail, null, subject, text, Layout(appName, "Ověření e-mailu", body));
     }
 
     /// <summary>Confirms a submitted registration; the outbox worker attaches the PDF overview of the entered data.</summary>

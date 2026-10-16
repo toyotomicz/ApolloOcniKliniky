@@ -162,6 +162,19 @@ public sealed class AdminTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Huge_page_numbers_return_an_empty_page_instead_of_a_server_error()
+    {
+        using var admin = factory.CreateTestClient();
+        await Scenario.SignInAdminAsync(admin);
+
+        var clinics = await (await admin.GetAsync($"/api/admin/clinics?page={int.MaxValue}&pageSize=100")).ReadJsonAsync();
+        Assert.Empty(clinics.GetProperty("items").EnumerateArray());
+
+        var audit = await admin.GetAsync($"/api/admin/audit?page={int.MaxValue}&pageSize=200");
+        await audit.EnsureStatusAsync(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task Clinic_list_supports_search_filters_and_pagination()
     {
         using var client = factory.CreateTestClient();
