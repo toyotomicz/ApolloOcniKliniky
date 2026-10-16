@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, CircleCheck, CircleX, MessageSquare, RotateCcw, Search, SearchX, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CircleCheck, CircleX, MessageSquare, RotateCcw, Search, SearchX, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { ApiError } from '../../api/client'
@@ -47,6 +47,7 @@ export function AdminClinicsPage() {
   const [bulkMessage, setBulkMessage] = useState('')
   const [bulkError, setBulkError] = useState<string | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const update = (changes: Record<string, string>) => {
     const nextParams = new URLSearchParams(params)
@@ -121,6 +122,26 @@ export function AdminClinicsPage() {
         return
       }
       setBulkError(e instanceof ApiError ? (e.fieldErrors.message ?? e.message) : 'Změnu se nepodařilo uložit.')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    setBulkBusy(true)
+    setBulkError(null)
+    try {
+      const result = await adminApi.bulkDelete([...selected])
+      toast.show(`Smazáno ${result.deleted.length} ${pluralize(result.deleted.length, 'klinika', 'kliniky', 'klinik')}.`)
+      setDeleteOpen(false)
+      setSelected(new Set())
+      await reload()
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        session.markSignedOut()
+        return
+      }
+      setBulkError(e instanceof ApiError ? e.message : 'Kliniky se nepodařilo smazat.')
     } finally {
       setBulkBusy(false)
     }
@@ -211,6 +232,16 @@ export function AdminClinicsPage() {
                   <Icon size={16} aria-hidden="true" /> {statusActionLabels[target].replace(' registraci', '')}
                 </button>
               ))}
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={() => {
+                  setBulkError(null)
+                  setDeleteOpen(true)
+                }}
+              >
+                <Trash2 size={16} aria-hidden="true" /> Smazat
+              </button>
               <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelected(new Set())}>
                 <X size={16} aria-hidden="true" /> Zrušit výběr
               </button>
@@ -340,6 +371,24 @@ export function AdminClinicsPage() {
           >
             {(a) => <textarea {...a} className="textarea" value={bulkMessage} onChange={(e) => setBulkMessage(e.target.value)} maxLength={1000} />}
           </Field>
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title={`Smazat ${selected.size} ${pluralize(selected.size, 'kliniku', 'kliniky', 'klinik')} natrvalo?`}
+        confirmLabel="Smazat natrvalo"
+        confirmVariant="danger-solid"
+        busy={bulkBusy}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void confirmDelete()}
+      >
+        <div className="stack">
+          <p style={{ margin: 0 }}>
+            Vybrané kliniky budou odstraněny i se všemi údaji, historií stavů, poznámkami a zprávami. V audit logu zůstane záznam
+            o smazání. Tuto akci nelze vrátit.
+          </p>
+          {bulkError && <Alert kind="error">{bulkError}</Alert>}
         </div>
       </ConfirmDialog>
     </div>

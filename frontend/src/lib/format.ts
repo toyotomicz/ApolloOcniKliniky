@@ -104,6 +104,7 @@ export const activityLabels: Record<ActivityType, string> = {
   emailFailed: 'Neodeslaný e-mail',
   demoDataSeeded: 'Nahrání demo dat',
   demoDataRemoved: 'Odstranění demo dat',
+  clinicDeleted: 'Smazání kliniky',
 }
 
 export const auditActorLabels: Record<AuditActor, string> = {

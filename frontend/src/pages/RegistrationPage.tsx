@@ -161,7 +161,7 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
           <h1>Registrace oční kliniky</h1>
           <p>Krok {stepIndex + 1} z {steps.length}: {step.title}</p>
         </div>
-        {plan && <span className="badge badge-info">Vybraný plán: {plan.name}</span>}
+        {plan && <span className="badge badge-info">Vybraná: {plan.name}</span>}
       </div>
 
       <ol className="wizard-steps" aria-label="Kroky registrace">

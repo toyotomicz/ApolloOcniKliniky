@@ -1,0 +1,8 @@
+# HTTPS in front of the web (Nginx) container. Caddy obtains and renews a Let's Encrypt certificate for
+# SITE_ADDRESS automatically and redirects HTTP to HTTPS.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	# Also proxies the SignalR WebSocket (/hubs); X-Forwarded-Proto=https is passed on to Nginx and the API.
+	reverse_proxy web:80
+}

@@ -1,6 +1,7 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useRef } from 'react'
+import { Maximize2, Minimize2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import type { ClinicStatus } from '../api/types'
 import { statusLabels } from '../lib/format'
 
@@ -22,6 +23,8 @@ interface ClinicMapProps {
   onOpen?: (id: string) => void
   /** Zoom used when there is a single point. */
   singleZoom?: number
+  /** Shows a button that enlarges the map to (almost) the whole window. */
+  expandable?: boolean
 }
 
 // Centre of the Czech Republic, used when there is nothing to fit.
@@ -38,7 +41,8 @@ const statusToken: Record<ClinicStatus, string> = {
  * and the status in the popup, never colour alone). Popups are built with DOM APIs, so clinic names are never
  * interpreted as HTML.
  */
-export function ClinicMap({ points, label, height = 480, onOpen, singleZoom = 14 }: ClinicMapProps) {
+export function ClinicMap({ points, label, height = 480, onOpen, singleZoom = 14, expandable = false }: ClinicMapProps) {
+  const [expanded, setExpanded] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layerRef = useRef<L.LayerGroup | null>(null)
@@ -114,7 +118,44 @@ export function ClinicMap({ points, label, height = 480, onOpen, singleZoom = 14
     }
   }, [points, singleZoom])
 
-  return <div ref={containerRef} className="clinic-map" style={{ height }} role="region" aria-label={label} />
+  // Enlarged map: Leaflet must re-measure its container; wheel zoom is enabled, Escape closes it, the page does not scroll.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    map.invalidateSize()
+    if (!expanded) return
+    map.scrollWheelZoom.enable()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false)
+    }
+    document.addEventListener('keydown', onKey)
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+      map.scrollWheelZoom.disable()
+    }
+  }, [expanded])
+
+  return (
+    <div className={`clinic-map-wrap ${expanded ? 'is-expanded' : ''}`}>
+      <div ref={containerRef} className="clinic-map" style={expanded ? undefined : { height }} role="region" aria-label={label} />
+      {expandable && (
+        <button
+          type="button"
+          className="map-expand"
+          onClick={() => setExpanded((v) => !v)}
+          aria-pressed={expanded}
+          aria-label={expanded ? 'Zmenšit mapu' : 'Zvětšit mapu'}
+          title={expanded ? 'Zmenšit mapu (Esc)' : 'Zvětšit mapu'}
+        >
+          {expanded ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
+          <span>{expanded ? 'Zmenšit' : 'Zvětšit'}</span>
+        </button>
+      )}
+    </div>
+  )
 }
 
 export function MapLegend() {

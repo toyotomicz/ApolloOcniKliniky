@@ -1,6 +1,7 @@
 import {
   Activity,
   ArrowRight,
+  ChevronRight,
   CircleCheck,
   CircleX,
   Clock,
@@ -35,17 +36,43 @@ interface MetricDef {
 }
 
 // The definitions mirror DashboardMetrics in DashboardService.cs.
-const metricDefs: MetricDef[] = [
-  { key: 'total', label: 'Registrované kliniky', hint: 'Všechny registrace bez ohledu na stav', icon: <Activity size={15} aria-hidden="true" />, value: (d) => String(d.metrics.totalClinics), to: '/admin/kliniky' },
-  { key: 'new', label: 'Nové dnes', hint: 'Registrace vytvořené od půlnoci', icon: <FilePlus2 size={15} aria-hidden="true" />, value: (d) => String(d.metrics.newToday) },
-  { key: 'pending', label: 'Čeká na posouzení', hint: 'Aktuálně ve stavu „Čeká“', icon: <Clock size={15} aria-hidden="true" />, value: (d) => String(d.metrics.pendingReview), to: '/admin/kliniky?status=pending', attention: (d) => d.metrics.pendingReview > 0 },
-  { key: 'unread', label: 'Nepřečtené zprávy', hint: 'Zprávy od klinik, které nikdo neotevřel', icon: <MessageSquare size={15} aria-hidden="true" />, value: (d) => String(d.metrics.unreadMessages), to: '/admin/kliniky?unread=1', attention: (d) => d.metrics.unreadMessages > 0 },
-  { key: 'approved', label: 'Schválené', hint: 'Aktuálně schválené kliniky', icon: <CircleCheck size={15} aria-hidden="true" />, value: (d) => String(d.metrics.approved), to: '/admin/kliniky?status=approved' },
-  { key: 'rejected', label: 'Zamítnuté', hint: 'Aktuálně zamítnuté kliniky', icon: <CircleX size={15} aria-hidden="true" />, value: (d) => String(d.metrics.rejected), to: '/admin/kliniky?status=rejected' },
-  { key: 'decision', label: 'Doba do rozhodnutí', hint: 'Průměr od registrace po schválení / zamítnutí (90 dní)', icon: <Hourglass size={15} aria-hidden="true" />, value: (d) => formatHours(d.metrics.averageDecisionHours) },
-  { key: 'rate', label: 'Míra schválení', hint: 'Schválené ze všech rozhodnutých registrací', icon: <Percent size={15} aria-hidden="true" />, value: (d) => (d.metrics.approvalRatePercent === null ? '—' : `${d.metrics.approvalRatePercent} %`) },
-  { key: 'signins', label: 'Přihlášené kliniky dnes', hint: 'Různé kliniky přihlášené kódem dnes', icon: <LogIn size={15} aria-hidden="true" />, value: (d) => String(d.metrics.uniqueClinicSignInsToday) },
+// First row: clinic counts that open the filtered clinic list. Second row: information only.
+const linkMetrics: MetricDef[] = [
+  { key: 'total', label: 'Registrované kliniky', hint: 'Všechny registrace', icon: <Activity size={15} aria-hidden="true" />, value: (d) => String(d.metrics.totalClinics), to: '/admin/kliniky' },
+  { key: 'pending', label: 'Čeká na posouzení', hint: 'Ve stavu „Čeká“', icon: <Clock size={15} aria-hidden="true" />, value: (d) => String(d.metrics.pendingReview), to: '/admin/kliniky?status=pending', attention: (d) => d.metrics.pendingReview > 0 },
+  { key: 'unread', label: 'Nepřečtené zprávy', hint: 'Od klinik, nikdo neotevřel', icon: <MessageSquare size={15} aria-hidden="true" />, value: (d) => String(d.metrics.unreadMessages), to: '/admin/kliniky?unread=1', attention: (d) => d.metrics.unreadMessages > 0 },
+  { key: 'approved', label: 'Schválené', hint: 'Aktuálně schválené', icon: <CircleCheck size={15} aria-hidden="true" />, value: (d) => String(d.metrics.approved), to: '/admin/kliniky?status=approved' },
+  { key: 'rejected', label: 'Zamítnuté', hint: 'Aktuálně zamítnuté', icon: <CircleX size={15} aria-hidden="true" />, value: (d) => String(d.metrics.rejected), to: '/admin/kliniky?status=rejected' },
 ]
+
+const infoMetrics: MetricDef[] = [
+  { key: 'new', label: 'Nové dnes', hint: 'Registrace od půlnoci', icon: <FilePlus2 size={15} aria-hidden="true" />, value: (d) => String(d.metrics.newToday) },
+  { key: 'signins', label: 'Přihlášené dnes', hint: 'Různé kliniky přihlášené kódem', icon: <LogIn size={15} aria-hidden="true" />, value: (d) => String(d.metrics.uniqueClinicSignInsToday) },
+  { key: 'decision', label: 'Doba do rozhodnutí', hint: 'Průměr za 90 dní', icon: <Hourglass size={15} aria-hidden="true" />, value: (d) => formatHours(d.metrics.averageDecisionHours) },
+  { key: 'rate', label: 'Míra schválení', hint: 'Schválené z rozhodnutých', icon: <Percent size={15} aria-hidden="true" />, value: (d) => (d.metrics.approvalRatePercent === null ? '—' : `${d.metrics.approvalRatePercent} %`) },
+]
+
+function MetricTile({ metric, data }: { metric: MetricDef; data: Dashboard }) {
+  const attention = metric.attention?.(data) ? 'metric-attention' : ''
+  const body = (
+    <>
+      <span className="metric-label">
+        {metric.icon}
+        <span>{metric.label}</span>
+        {metric.to && <ChevronRight size={16} aria-hidden="true" className="metric-arrow" />}
+      </span>
+      <span className="metric-value">{metric.value(data)}</span>
+      <span className="metric-hint">{metric.hint}</span>
+    </>
+  )
+  return metric.to ? (
+    <Link to={metric.to} className={`card metric metric-link ${attention}`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={`metric metric-info ${attention}`}>{body}</div>
+  )
+}
 
 const activityIcons: Partial<Record<ActivityType, ReactNode>> = {
   clinicRegistered: <FilePlus2 size={16} aria-hidden="true" />,
@@ -120,29 +147,17 @@ export function AdminDashboardPage() {
       {data && (
         // While refetching, the previous numbers stay visible (no skeleton flash).
         <div className={loading ? 'is-refreshing' : undefined} aria-busy={loading}>
-          <div className="metric-grid">
-            {metricDefs.map((m) => {
-              const content = (
-                <>
-                  <span className="metric-label">
-                    {m.icon}
-                    {m.label}
-                  </span>
-                  <span className="metric-value">{m.value(data)}</span>
-                  <span className="metric-hint">{m.hint}</span>
-                </>
-              )
-              const className = `card metric ${m.attention?.(data) ? 'metric-attention' : ''}`
-              return m.to ? (
-                <Link key={m.key} to={m.to} className={className}>
-                  {content}
-                </Link>
-              ) : (
-                <div key={m.key} className={className}>
-                  {content}
-                </div>
-              )
-            })}
+          <h2 className="metric-group-title">Kliniky</h2>
+          <div className="metric-grid metric-grid-links">
+            {linkMetrics.map((m) => (
+              <MetricTile key={m.key} metric={m} data={data} />
+            ))}
+          </div>
+          <h2 className="metric-group-title">Aktivita a výkon</h2>
+          <div className="metric-grid metric-grid-info">
+            {infoMetrics.map((m) => (
+              <MetricTile key={m.key} metric={m} data={data} />
+            ))}
           </div>
 
           <div className="dashboard-grid">

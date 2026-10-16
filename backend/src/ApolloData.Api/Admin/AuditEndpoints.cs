@@ -76,6 +76,7 @@ public static class AuditEndpoints
         [ActivityEventType.EmailFailed] = "Neodeslaný e-mail",
         [ActivityEventType.DemoDataSeeded] = "Nahrání demo dat",
         [ActivityEventType.DemoDataRemoved] = "Odstranění demo dat",
+        [ActivityEventType.ClinicDeleted] = "Smazání kliniky",
     };
 
     public static void MapAuditEndpoints(this RouteGroupBuilder adminGroup)

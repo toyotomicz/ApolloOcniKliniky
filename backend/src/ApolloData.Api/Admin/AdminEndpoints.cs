@@ -59,6 +59,10 @@ public sealed record BulkStatusRequest(IReadOnlyList<Guid>? ClinicIds, ClinicSta
 /// <param name="NotFound">Ids that do not exist (e.g. deleted demo data).</param>
 public sealed record BulkStatusResult(IReadOnlyList<Guid> Updated, IReadOnlyList<Guid> Skipped, IReadOnlyList<Guid> NotFound);
 
+public sealed record BulkDeleteRequest(IReadOnlyList<Guid>? ClinicIds);
+
+public sealed record BulkDeleteResult(IReadOnlyList<Guid> Deleted, IReadOnlyList<Guid> NotFound);
+
 public sealed record MapClinicDto(Guid Id, string Name, string City, string PlanCode, ClinicStatus Status, double Latitude, double Longitude);
 
 /// <param name="WithoutLocation">Matching clinics whose address has not been resolved (yet).</param>
@@ -84,6 +88,8 @@ public static class AdminEndpoints
         group.MapPost("/clinics/{id:guid}/status", ChangeStatusAsync);
         group.MapPost("/clinics/bulk-status", BulkStatusAsync);
         group.MapPost("/clinics/{id:guid}/notes", AddNoteAsync);
+        group.MapDelete("/clinics/{id:guid}", DeleteAsync);
+        group.MapPost("/clinics/bulk-delete", BulkDeleteAsync);
         group.MapAdminMessageEndpoints();
         group.MapAuditEndpoints();
     }
@@ -307,6 +313,60 @@ public static class AdminEndpoints
         logger.LogInformation("Bulk status change to {Status} by administrator {AdminId}: {Updated} updated, {Skipped} skipped, {NotFound} not found",
             newStatus, adminId, updated.Count, skipped.Count, notFound.Count);
         return TypedResults.Ok(new BulkStatusResult(updated, skipped, notFound));
+    }
+
+    private static async Task<IResult> DeleteAsync(
+        Guid id, ClaimsPrincipal user, AppDbContext db, TimeProvider time, IAdminNotifier notifier,
+        ILogger<BulkDeleteRequest> logger, CancellationToken ct)
+    {
+        var result = await DeleteClinicsAsync([id], user.GetSubjectId(), db, time, ct);
+        if (result.Deleted.Count == 0) return ApiProblems.NotFound("Klinika nebyla nalezena.");
+        await notifier.ClinicsChangedAsync(new ClinicsChangedEvent(result.Deleted, "deleted"));
+        logger.LogInformation("Clinic {ClinicId} deleted by administrator {AdminId}", id, user.GetSubjectId());
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<IResult> BulkDeleteAsync(
+        BulkDeleteRequest request, ClaimsPrincipal user, AppDbContext db, TimeProvider time, IAdminNotifier notifier,
+        ILogger<BulkDeleteRequest> logger, CancellationToken ct)
+    {
+        var ids = request.ClinicIds?.Distinct().ToList() ?? [];
+        if (ids.Count == 0) return ApiProblems.Validation("clinicIds", "Vyberte alespoň jednu kliniku.");
+        if (ids.Count > MaxBulkSize) return ApiProblems.Validation("clinicIds", $"Najednou lze smazat nejvýše {MaxBulkSize} klinik.");
+
+        var result = await DeleteClinicsAsync(ids, user.GetSubjectId(), db, time, ct);
+        if (result.Deleted.Count > 0) await notifier.ClinicsChangedAsync(new ClinicsChangedEvent(result.Deleted, "deleted"));
+        logger.LogInformation("Bulk delete by administrator {AdminId}: {Deleted} deleted, {NotFound} not found",
+            user.GetSubjectId(), result.Deleted.Count, result.NotFound.Count);
+        return TypedResults.Ok(result);
+    }
+
+    /// <summary>
+    /// Permanently deletes clinics with their history, notes, messages, sessions and login codes (database cascades).
+    /// Unsent notification emails are dropped. The audit log keeps its events (detached from the clinic) plus one
+    /// "clinic deleted" event per clinic that names it, so it stays clear who deleted what and when.
+    /// </summary>
+    private static async Task<BulkDeleteResult> DeleteClinicsAsync(
+        IReadOnlyList<Guid> ids, Guid adminId, AppDbContext db, TimeProvider time, CancellationToken ct)
+    {
+        var clinics = await db.Clinics.Where(c => ids.Contains(c.Id)).ToListAsync(ct);
+        var deleted = clinics.Select(c => c.Id).ToList();
+        if (deleted.Count > 0)
+        {
+            var now = time.GetUtcNow().UtcDateTime;
+            // Everything below is saved by one SaveChanges, i.e. in one transaction.
+            db.OutboundEmails.RemoveRange(await db.OutboundEmails
+                .Where(e => e.ClinicId != null && deleted.Contains(e.ClinicId.Value) && e.SentAt == null)
+                .ToListAsync(ct));
+            foreach (var clinic in clinics)
+            {
+                db.Record(ActivityEventType.ClinicDeleted, now, administratorId: adminId,
+                    detail: clinic.Name.Length > 480 ? clinic.Name[..480] : clinic.Name);
+            }
+            db.Clinics.RemoveRange(clinics);
+            await db.SaveChangesAsync(ct);
+        }
+        return new BulkDeleteResult(deleted, ids.Except(deleted).ToList());
     }
 
     private static async Task<IResult> AddNoteAsync(

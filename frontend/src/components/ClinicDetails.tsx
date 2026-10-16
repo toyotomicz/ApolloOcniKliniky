@@ -80,7 +80,7 @@ export function PlanSummary({ clinic }: { clinic: ClinicProfile }) {
   return (
     <section className="card" aria-labelledby="plan-section">
       <div className="card-header">
-        <h2 id="plan-section">Plán {clinic.plan.name}</h2>
+        <h2 id="plan-section">{clinic.plan.name}</h2>
       </div>
       <div className="card-body">
         <p className="muted small">{clinic.plan.tagline}</p>

@@ -4,6 +4,7 @@ import type {
   AdminMe,
   AdminNote,
   AuditItem,
+  BulkDeleteResult,
   BulkStatusResult,
   ClinicListItem,
   ClinicMap,
@@ -97,6 +98,8 @@ export const adminApi = {
     http.post<AdminClinicDetail>(`/api/admin/clinics/${encodeURIComponent(id)}/status`, body),
   bulkStatus: (body: { clinicIds: string[]; status: ClinicStatus; message: string | null }) =>
     http.post<BulkStatusResult>('/api/admin/clinics/bulk-status', body),
+  deleteClinic: (id: string) => http.delete<void>(`/api/admin/clinics/${encodeURIComponent(id)}`),
+  bulkDelete: (clinicIds: string[]) => http.post<BulkDeleteResult>('/api/admin/clinics/bulk-delete', { clinicIds }),
   addNote: (id: string, text: string) => http.post<AdminNote>(`/api/admin/clinics/${encodeURIComponent(id)}/notes`, { text }),
   messages: (id: string) => http.get<Message[]>(`/api/admin/clinics/${encodeURIComponent(id)}/messages`),
   sendMessage: (id: string, body: string) => http.post<Message>(`/api/admin/clinics/${encodeURIComponent(id)}/messages`, { body }),

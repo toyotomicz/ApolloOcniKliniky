@@ -1,5 +1,5 @@
 import { Building2, LayoutDashboard, LogOut, Map as MapIcon, ScrollText, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { AdminRealtimeProvider, RealtimeIndicator } from '../admin/AdminRealtime'
 import { useAdminSession } from '../auth/sessions'
@@ -20,6 +20,22 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
+
+  // Prefetch the other admin sections right after sign-in, so switching in the top bar never waits for a download.
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return
+    const prefetch = () =>
+      void Promise.all([
+        import('../pages/admin/AdminDashboardPage'),
+        import('../pages/admin/AdminClinicsPage'),
+        import('../pages/admin/AdminClinicDetailPage'),
+        import('../pages/admin/AdminMapPage'),
+        import('../pages/admin/AdminAuditPage'),
+        import('../pages/admin/AdminSecurityPage'),
+      ]).catch(() => undefined)
+    const timer = window.setTimeout(prefetch, 300)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const logout = async () => {
     setBusy(true)

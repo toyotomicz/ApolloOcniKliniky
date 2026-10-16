@@ -55,7 +55,10 @@ public sealed class UnitTests
         Assert.False(PlanCatalog.Find("standard")!.Requires(PlanFieldGroups.ServiceConfiguration));
         Assert.True(PlanCatalog.Find("premium")!.Requires(PlanFieldGroups.ServiceConfiguration));
         Assert.Null(PlanCatalog.Find("enterprise"));
-        Assert.Single(PlanCatalog.All, p => p.Highlighted);
+        Assert.Equal(["Úroveň 1", "Úroveň 2", "Úroveň 3"], PlanCatalog.All.Select(p => p.Name));
+        // "Not part of this level" rows are kept in order, e.g. level 2 has no direct booking but does set capacity.
+        Assert.Equal([true, true, false, true, false], PlanCatalog.Find("standard")!.Features.Select(f => f.Included));
+        Assert.All(PlanCatalog.Find("premium")!.Features, f => Assert.True(f.Included));
     }
 
     [Fact]

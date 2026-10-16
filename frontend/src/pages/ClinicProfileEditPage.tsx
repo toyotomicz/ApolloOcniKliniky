@@ -109,7 +109,7 @@ function ProfileForm({ clinic, plan }: { clinic: ClinicProfile; plan: Plan | und
                 ['Název kliniky', clinic.name],
                 ['IČO', clinic.organizationId ?? '—'],
                 ['E-mail pro přihlášení', clinic.email],
-                ['Plán', clinic.plan.name],
+                ['Úroveň registrace', clinic.plan.name],
               ]}
             />
           </section>

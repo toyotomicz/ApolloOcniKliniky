@@ -4,12 +4,18 @@ export type ClinicStatus = 'pending' | 'approved' | 'rejected'
 export type OnboardingPreference = 'online' | 'onSite'
 export type FieldGroup = 'operationalContact' | 'serviceConfiguration'
 
+export interface PlanFeature {
+  text: string
+  /** false = shown as "not part of this level" */
+  included: boolean
+}
+
 export interface Plan {
   code: string
   name: string
   tagline: string
   description: string
-  features: string[]
+  features: PlanFeature[]
   fieldGroups: FieldGroup[]
   highlighted: boolean
   badge: string | null
@@ -149,6 +155,7 @@ export type ActivityType =
   | 'emailFailed'
   | 'demoDataSeeded'
   | 'demoDataRemoved'
+  | 'clinicDeleted'
 
 export interface ActivityItem {
   id: number
@@ -237,6 +244,11 @@ export interface Message {
   createdAt: string
   /** When the recipient first read it, as it was before this request marked anything read. */
   readAt: string | null
+}
+
+export interface BulkDeleteResult {
+  deleted: string[]
+  notFound: string[]
 }
 
 export interface BulkStatusResult {

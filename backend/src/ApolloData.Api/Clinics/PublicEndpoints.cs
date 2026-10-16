@@ -14,7 +14,7 @@ namespace ApolloData.Api.Clinics;
 
 public sealed record PlanDto(
     string Code, string Name, string Tagline, string Description,
-    IReadOnlyList<string> Features, IReadOnlyList<string> FieldGroups, bool Highlighted, string? Badge);
+    IReadOnlyList<PlanFeature> Features, IReadOnlyList<string> FieldGroups, bool Highlighted, string? Badge);
 
 public sealed record RegistrationResponse(string Email, bool VerificationEmailSent, int CodeLifetimeMinutes);
 

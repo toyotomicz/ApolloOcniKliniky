@@ -1,0 +1,31 @@
+# HTTPS for a server: Caddy terminates TLS (automatic Let's Encrypt certificate) in front of the web container.
+# Enable it in the server's .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml
+#   SITE_ADDRESS=your.domain.example     (or <ip-with-dashes>.sslip.io when there is no domain)
+#   COOKIE_SECURE=true
+#   APP_PUBLIC_URL=https://your.domain.example
+services:
+  web:
+    # Only Caddy talks to Nginx; it is no longer published on the host.
+    ports: !reset []
+
+  caddy:
+    image: caddy:2.10-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS must be set in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks: [frontend]
+
+volumes:
+  caddy-data:
+  caddy-config:

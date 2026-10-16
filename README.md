@@ -12,7 +12,7 @@ Vzhled (barvy, písma) je sladěný s webem [apollodata.cz](https://www.apolloda
 
 | | |
 |---|---|
-| **Produkční instance** | http://147.228.121.223 (administrace: `/admin`) |
+| **Produkční instance** | https://aether223.zcu.cz (administrace: `/admin`) |
 | **Repozitář** | https://github.com/toyotomicz/ApolloOcniKliniky (soukromý) |
 | **Technologie** | .NET 10 · ASP.NET Core · EF Core · PostgreSQL 17 · React 19 · TypeScript · Vite · Docker |
 
@@ -61,11 +61,12 @@ Vzhled (barvy, písma) je sladěný s webem [apollodata.cz](https://www.apolloda
   do rozhodnutí, míra schválení, přihlášené kliniky dnes), graf registrací za 7 / 30 dní, průchod registrací
   (registrace → ověřený e-mail → schválení), rozdělení podle plánů a poslední aktivita.
 - **Kliniky** – vyhledávání (název, e-mail, město, IČO), filtry podle stavu, plánu a nepřečtených zpráv, řazení,
-  stránkování a **hromadné akce** (schválit / zamítnout / vrátit k posouzení vybrané kliniky v jedné transakci).
+  stránkování a **hromadné akce** (schválit / zamítnout / vrátit k posouzení / smazat vybrané kliniky v jedné transakci).
 - **Detail kliniky** – všechny údaje, rozhodnutí s potvrzením (zamítnutí vyžaduje důvod), historie stavů,
-  interní poznámky, **konverzace s klinikou**, malá mapa polohy, PDF potvrzení a odkaz do audit logu.
-- **Mapa klinik** – OpenStreetMap, barva značky podle stavu, filtry, proklik na detail. Polohu z adresy dohledává
-  proces na pozadí.
+  interní poznámky, **konverzace s klinikou**, mapa polohy (lze zvětšit), PDF potvrzení, odkaz do audit logu
+  a **trvalé smazání kliniky** (s potvrzením; v audit logu zůstane záznam „Smazání kliniky“).
+- **Mapa klinik** – OpenStreetMap, barva značky podle stavu, filtry, proklik na detail, zvětšení na celou obrazovku.
+  Polohu z adresy dohledává proces na pozadí.
 - **Notifikace v reálném čase** (SignalR přes WebSocket) – nová registrace nebo zpráva se okamžitě ohlásí
   a otevřené přehledy se samy obnoví. Stav spojení ukazuje indikátor „Živě“ v horní liště.
 - **Audit log** – kdo, kdy a co udělal (registrace, přihlášení včetně neúspěšných, změny stavu, zprávy, odeslané
@@ -334,54 +335,64 @@ Zastavení: `docker compose down` (data zůstanou). Smazání včetně dat: `doc
 
 ## Nasazení na server
 
-Aplikace běží na serveru **147.228.121.223** (Ubuntu 26.04 LTS, 1 CPU, 4 GB RAM) – http://147.228.121.223.
-Stačí 2 GB RAM; za běhu stack spotřebuje zhruba 0,5–1 GB.
+Aplikace běží na serveru **147.228.121.223** (Ubuntu 26.04 LTS, 1 CPU, 4 GB RAM) s HTTPS na adrese
+**https://aether223.zcu.cz**. Stačí 2 GB RAM; za běhu stack spotřebuje zhruba 0,5–1 GB.
 
 ### Jak je server nastavený
 
 | Co | Kde / jak |
 |---|---|
 | Docker | `docker.io` + `docker-compose-v2` z balíčků Ubuntu, služba `docker` se spouští po startu |
-| Aplikace | `/opt/apollodata` – `docker-compose.yml` a `.env` (práva `600`, jen root) |
-| Obrazy | `apollodata-api`, `apollodata-web` (sestavené lokálně a přenesené), `postgres:17-alpine` |
-| Port | 80 (HTTP) – `WEB_PORT=80`; databáze nemá publikovaný port |
-| Firewall | `ufw`: povoleno jen SSH (22) a HTTP (80) |
+| Aplikace | `/opt/apollodata` – compose soubory, `deploy/Caddyfile`, zdrojové kódy a `.env` (práva `600`, jen root) |
+| Kontejnery | `caddy` (HTTPS), `web` (Nginx), `api`, `db` (PostgreSQL) – databáze ani Nginx nemají publikovaný port |
+| HTTPS | Caddy získává a obnovuje certifikát Let's Encrypt, HTTP přesměrovává na HTTPS, posílá HSTS |
+| Firewall | `ufw`: povoleno jen SSH (22), HTTP (80) a HTTPS (443) |
 | Restart | kontejnery mají `restart: unless-stopped` – po restartu serveru se spustí samy |
 
-Serverový `.env` vychází z lokálního, s těmito rozdíly: `WEB_PORT=80`, `APP_PUBLIC_URL=http://147.228.121.223`,
-`COOKIE_SECURE=false` (server zatím nemá HTTPS) a vlastní vygenerované `POSTGRES_PASSWORD` a `OTP_HASH_KEY`.
+Doména `aether223.zcu.cz` ukazuje na `147.228.121.223`. Při změně domény stačí v serverovém `.env` upravit
+`SITE_ADDRESS` a `APP_PUBLIC_URL` a spustit `docker compose up -d` – Caddy si nový certifikát vyžádá sám.
+(Bez vlastní domény lze použít např. `147-228-121-223.sslip.io`.)
+
+Serverový `.env` vychází z lokálního s těmito rozdíly:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml
+SITE_ADDRESS=aether223.zcu.cz
+APP_PUBLIC_URL=https://aether223.zcu.cz
+COOKIE_SECURE=true
+POSTGRES_PASSWORD=<vlastní>
+OTP_HASH_KEY=<vlastní>
+```
+
+`COMPOSE_FILE` zajistí, že `docker compose` na serveru vždy použije i `docker-compose.https.yml` (Caddy).
 
 ### Nasazení nové verze
 
-Obrazy se sestaví na vývojovém počítači a přes SSH se přenesou na server – server nepotřebuje zdrojový kód
-ani .NET/Node a nesestavuje nic na svém jediném jádru.
-
 ```bash
-powershell -File scripts/deploy.ps1
+powershell -File scripts/deploy.ps1 -BuildOnServer
 ```
 
-Skript zkontroluje Docker a volné místo, sestaví obrazy `api` a `web`, přenese je (`docker save | ssh docker load`),
-zkopíruje `docker-compose.yml` do `/opt/apollodata` a restartuje stack; migrace databáze se aplikují automaticky
-při startu API. Serverový `.env` se nikdy nepřepisuje. Parametry: `-Server`, `-User` (výchozí `root`),
-`-SkipBuild` (jen přenese existující obrazy).
+Pošle na server commitnutý stav (`git archive HEAD`), obrazy sestaví přímo na serveru, restartuje stack a uklidí
+staré obrazy a build cache; migrace databáze se aplikují automaticky při startu API. Necommitnuté změny se
+nenasazují. Serverový `.env` se nikdy nepřepisuje.
+
+Bez přepínače `-BuildOnServer` se obrazy sestaví lokálně a na server se přenesou hotové (`docker save | ssh docker
+load`) – rychlejší, ale lokálně je potřeba aspoň 5 GB volného místa a běžící Docker Desktop. Další parametry:
+`-Server`, `-User` (výchozí `root`), `-SkipBuild` (jen přenese existující lokální obrazy).
 
 ### První instalace na čistý server
 
-```bash
-ssh root@SERVER 'apt-get update && apt-get install -y docker.io docker-compose-v2 && systemctl enable --now docker'
-```
-
-```bash
-ssh root@SERVER 'mkdir -p /opt/apollodata && chmod 700 /opt/apollodata'
-```
-
-Pak na server zkopírujte připravený `.env` (`scp .env root@SERVER:/opt/apollodata/.env`, upravte `WEB_PORT`,
-`APP_PUBLIC_URL`, `COOKIE_SECURE` a vygenerujte nová hesla), spusťte `scripts/deploy.ps1 -Server SERVER`
-a povolte firewall:
-
-```bash
-ssh root@SERVER 'ufw allow OpenSSH && ufw allow 80/tcp && ufw --force enable'
-```
+1. Docker a adresář aplikace:
+   ```bash
+   ssh root@SERVER 'apt-get update && apt-get install -y docker.io docker-compose-v2 && systemctl enable --now docker && mkdir -p /opt/apollodata && chmod 700 /opt/apollodata'
+   ```
+2. Na server zkopírujte připravený `.env` (`scp .env root@SERVER:/opt/apollodata/.env`), upravte hodnoty podle
+   předchozí sekce a vygenerujte nová hesla.
+3. Firewall:
+   ```bash
+   ssh root@SERVER 'ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443 && ufw --force enable'
+   ```
+4. Nasazení: `powershell -File scripts/deploy.ps1 -Server SERVER -BuildOnServer`.
 
 ### Údržba na serveru
 
@@ -390,20 +401,13 @@ Všechny příkazy se spouštějí v `/opt/apollodata` (`ssh root@147.228.121.22
 | Úkol | Příkaz |
 |---|---|
 | Stav kontejnerů | `docker compose ps` |
-| Logy API | `docker compose logs -f api` |
+| Logy API / HTTPS | `docker compose logs -f api` / `docker compose logs -f caddy` |
 | Restart | `docker compose restart` |
 | Změna hesla administrátora | upravit `ADMIN_PASSWORD` v `.env`, pak `docker compose run --rm api reset-admin-password` |
 | Vypnutí 2FA (ztracený telefon) | `docker compose run --rm api reset-admin-2fa` |
 | Demo data nahrát / odstranit | `docker compose run --rm api seed-demo-data` / `… seed-demo-data --remove` |
 | Záloha databáze | `docker compose exec -T db pg_dump -U apollo apollodata > zaloha.sql` |
-| Úklid starých obrazů | `docker image prune -f` |
-
-### HTTPS
-
-Server zatím běží na čistém HTTP – hesla a kódy tak po síti putují nešifrovaně, proto je `COOKIE_SECURE=false`.
-Pro ostrý provoz je potřeba doména (např. `apollo.example.cz`) nasměrovaná na IP serveru; pak stačí před Nginx
-předřadit Caddy s automatickým certifikátem Let's Encrypt, otevřít port 443, nastavit `COOKIE_SECURE=true`
-a `APP_PUBLIC_URL=https://…`.
+| Úklid starých obrazů | `docker image prune -f && docker builder prune -f` |
 
 ---
 
@@ -413,12 +417,12 @@ Soubor `.env` se **nikdy necommituje** (je v `.gitignore`). Proměnné:
 
 | Proměnná | Výchozí | Popis |
 |---|---|---|
-| `WEB_PORT` | `8080` | port, na kterém Nginx publikuje aplikaci (na serveru `80`) |
+| `WEB_PORT` | `8080` | port, na kterém Nginx publikuje aplikaci (na serveru s HTTPS se nepoužije) |
 | `APP_NAME` | `ApolloData` | název v e-mailech, PDF a v aplikaci Authenticator |
 | `APP_PUBLIC_URL` | `http://localhost:8080` | veřejná adresa aplikace pro odkazy v e-mailech |
 | `ASPNETCORE_ENVIRONMENT` | `Production` | `Development` zapne Swagger a detail výjimek v odpovědích |
 | `ENABLE_SWAGGER` | `false` | Swagger UI i mimo Development |
-| `COOKIE_SECURE` | `true` | příznak `Secure` u cookies; prohlížeče ho na `http://localhost` akceptují. Na serveru bez HTTPS `false` |
+| `COOKIE_SECURE` | `true` | příznak `Secure` u cookies; prohlížeče ho na `http://localhost` akceptují. `false` jen při přístupu přes čisté HTTP z jiného počítače |
 | `REPORTING_TIME_ZONE` | `Europe/Prague` | časové pásmo pro „dnes“, graf, PDF a CSV |
 | `POSTGRES_DB` / `POSTGRES_USER` | `apollodata` / `apollo` | databáze a uživatel |
 | `POSTGRES_PASSWORD` | – (povinné) | heslo DB; jen písmena a číslice |
@@ -431,6 +435,8 @@ Soubor `.env` se **nikdy necommituje** (je v `.gitignore`). Proměnné:
 | `SMTP_USE_STARTTLS` | `true` | `true` = STARTTLS (Gmail 587); `false` = implicitní TLS na portu 465, jinak bez TLS |
 | `GEOCODING_ENABLED` | `true` | dohledávání polohy klinik pro mapu (OpenStreetMap Nominatim) |
 | `GEOCODING_CONTACT_EMAIL` | – | kontakt předávaný Nominatimu (doporučeno jeho pravidly) |
+| `COMPOSE_FILE` | – | na serveru `docker-compose.yml:docker-compose.https.yml` (zapne Caddy/HTTPS) |
+| `SITE_ADDRESS` | – | doména pro HTTPS certifikát (jen s `docker-compose.https.yml`) |
 
 Pokročilé (proměnné prostředí / `appsettings.json`): `Auth__OtpLifetimeMinutes` (10), `Auth__OtpMaxAttempts` (5),
 `Auth__OtpResendCooldownSeconds` (60), `Auth__OtpMaxCodesPerHour` (5), `Auth__AdminMaxFailedAttempts` (5),
@@ -565,7 +571,7 @@ cd backend && dotnet test
 cd frontend && npm test
 ```
 
-- **Backend – 90 testů.** Integrační testy běží proti skutečnému PostgreSQL v Testcontainers (vyžaduje Docker).
+- **Backend – 92 testů.** Integrační testy běží proti skutečnému PostgreSQL v Testcontainers (vyžaduje Docker).
   E-mail nahrazuje falešný odesílatel, geokódování falešný geokodér a čas `FakeTimeProvider` – testy nikdy
   nepoužívají Gmail ani internet.
 - **Frontend – 26 testů** (Vitest + React Testing Library), plus `npm run lint` (oxlint) a `npm run typecheck`.
@@ -606,6 +612,8 @@ Nebezpečné metody vyžadují hlavičku `X-CSRF-TOKEN` (token z `GET /api/secur
 | GET | `/api/admin/clinics/{id}/confirmation.pdf` | admin | PDF potvrzení kliniky |
 | POST | `/api/admin/clinics/{id}/status` | admin | `{ status, message?, internalNote?, version }` |
 | POST | `/api/admin/clinics/bulk-status` | admin | `{ clinicIds (max. 100), status, message? }` – jedna transakce |
+| DELETE | `/api/admin/clinics/{id}` | admin | trvalé smazání kliniky (kaskádově historie, poznámky, zprávy, relace) |
+| POST | `/api/admin/clinics/bulk-delete` | admin | `{ clinicIds (max. 100) }` → `{ deleted, notFound }` |
 | POST | `/api/admin/clinics/{id}/notes` | admin | `{ text }` |
 | GET / POST | `/api/admin/clinics/{id}/messages` | admin | konverzace s klinikou |
 | GET | `/api/admin/audit` | admin | `from`, `to`, `type`, `actor`, `clinicId`, `search`, `page`, `pageSize` |
@@ -641,7 +649,7 @@ posledních 90 dní); *Míra schválení* = schválené / (schválené + zamítn
 - **Nginx**: CSP (dlaždice jen z `tile.openstreetmap.org`), `X-Frame-Options`, `nosniff`, `Referrer-Policy`,
   `Permissions-Policy`; databáze bez publikovaného portu; API kontejner běží pod neprivilegovaným uživatelem.
 
-Pro ostrý provoz zbývá: **HTTPS** (viz [Nasazení → HTTPS](#https)), tajemství mimo `.env`, šifrování klíčů Data
+Pro ostrý provoz zbývá: tajemství mimo `.env`, šifrování klíčů Data
 Protection, pravidelné zálohy databáze, dedikovaný e-mailový provider (SPF/DKIM) místo Gmailu a monitoring.
 Při více instancích API navíc distribuovaný rate limiting, Redis backplane pro SignalR a claimování řádků outboxu.
 
@@ -670,7 +678,9 @@ Při více instancích API navíc distribuovaný rate limiting, Redis backplane 
 | `POSTGRES_PASSWORD must be set` | chybí `.env` → `scripts/init-env.ps1` |
 | API se restartuje, log „ADMIN_PASSWORD is not configured“ | doplňte `ADMIN_PASSWORD` (min. 12 znaků) a `docker compose up -d` |
 | Nedaří se přihlásit do administrace | heslo v databázi se mění jen resetem (viz [Administrátor](#administrátor-a-dvoufázové-ověření)); po 5 chybách je účet 15 min zamčený |
-| Na serveru se po přihlášení vrací na přihlašovací stránku | server běží přes HTTP → v jeho `.env` musí být `COOKIE_SECURE=false` |
+| Po přihlášení se vrací na přihlašovací stránku | stránka běží přes čisté HTTP, ale `COOKIE_SECURE=true` → použijte HTTPS adresu (nebo lokálně `localhost`) |
+| HTTPS certifikát se nevydal | `docker compose logs caddy`; porty 80 a 443 musí být dostupné z internetu a `SITE_ADDRESS` musí ukazovat na server |
+| Kód z e-mailu nepřišel | v logu API je „delivered to SMTP server“ → Gmail e-mail převzal; zkontrolujte spam / „Hromadné“ u příjemce. E-maily z běžné Gmail adresy mohou cizí poskytovatelé (např. Seznam) filtrovat – pro provoz je vhodný vlastní doménový odesílatel s SPF/DKIM |
 | Kód nebo e-mail o stavu nepřichází | `docker compose logs api` → „SMTP delivery failed“; zkontrolujte heslo aplikace, port 587, spam. Stav e-mailů je i v audit logu |
 | Indikátor v administraci ukazuje „Offline“ | Nginx musí proxyovat `/hubs/` (WebSocket); obnovte stránku |
 | Klinika není na mapě | poloha se dohledává na pozadí (~1 s/klinika); adresu nemusí Nominatim najít |
@@ -678,5 +688,5 @@ Při více instancích API navíc distribuovaný rate limiting, Redis backplane 
 | „Platnost formuláře vypršela“ | obnovte stránku (nový CSRF token) |
 | Testy backendu selžou na Dockeru | Testcontainers potřebuje běžící Docker |
 | Docker Desktop „unable to start“ / zaseknutý build | dojde-li místo na disku, uvolněte ho, `docker builder prune -f` a restart PC. Poškozený obraz po zaseknutém buildu: `docker compose build --no-cache api` |
-| `deploy.ps1` hlásí „Docker is not running“ | spusťte Docker Desktop |
+| `deploy.ps1` hlásí „Docker is not running“ nebo málo místa | spusťte Docker Desktop, nebo nasaďte s `-BuildOnServer` |
 | Začít s prázdnou databází | `docker compose down -v` (smaže všechna data) |

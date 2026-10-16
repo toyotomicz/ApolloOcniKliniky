@@ -187,6 +187,7 @@ public enum ActivityEventType
     EmailFailed,
     DemoDataSeeded,
     DemoDataRemoved,
+    ClinicDeleted,
 }
 
 /// <summary>
