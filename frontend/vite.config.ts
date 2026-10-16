@@ -12,8 +12,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: apiTarget, changeOrigin: false },
-      '/hubs': { target: apiTarget, ws: true },
+      // A remote (https) target needs its own Host header; the local API keeps the browser's.
+      '/api': { target: apiTarget, changeOrigin: apiTarget.startsWith('https') },
+      '/hubs': { target: apiTarget, ws: true, changeOrigin: apiTarget.startsWith('https') },
       '/swagger': { target: apiTarget },
       '/openapi': { target: apiTarget },
     },
