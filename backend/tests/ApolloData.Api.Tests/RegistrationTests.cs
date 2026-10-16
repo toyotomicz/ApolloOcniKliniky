@@ -10,13 +10,13 @@ namespace ApolloData.Api.Tests;
 public sealed class RegistrationTests(ApiFactory factory)
 {
     [Fact]
-    public async Task Plans_endpoint_returns_three_plans_with_standard_highlighted()
+    public async Task Plans_endpoint_returns_the_three_registration_levels()
     {
         using var client = factory.CreateTestClient();
         var plans = await client.GetJsonAsync<List<PlanResponse>>("/api/plans");
 
         Assert.Equal(["basic", "standard", "premium"], plans.Select(p => p.Code));
-        Assert.True(plans.Single(p => p.Code == "standard").Highlighted);
+        Assert.Equal("Úroveň 2", plans.Single(p => p.Code == "standard").Name);
         Assert.Empty(plans.Single(p => p.Code == "basic").FieldGroups);
         Assert.Equal(["operationalContact", "serviceConfiguration"], plans.Single(p => p.Code == "premium").FieldGroups);
     }
