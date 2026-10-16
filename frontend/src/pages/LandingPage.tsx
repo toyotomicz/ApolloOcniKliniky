@@ -40,11 +40,11 @@ export function LandingPage() {
         <div className="container hero-inner">
           <h1 id="hero-title">Registrace oční kliniky jednoduše</h1>
           <p className="hero-lead">
-            Pro oční kliniky a ambulance. Vyberte plán, vyplňte údaje a přihlaste se kódem z <span className="nowrap">e-mailu</span>.
+            Pro oční kliniky a ambulance. Zvolte úroveň registrace, vyplňte údaje a přihlaste se kódem z <span className="nowrap">e-mailu</span>.
           </p>
           <div className="hero-actions">
             <a href="#plany" className="btn btn-primary btn-lg">
-              Vybrat plán
+              Zvolit úroveň
             </a>
             <Link to="/prihlaseni" className="btn btn-lg">
               Přihlásit se
@@ -82,14 +82,14 @@ export function LandingPage() {
           </div>
 
           {error && (
-            <Alert kind="error" title="Plány se nepodařilo načíst">
+            <Alert kind="error" title="Úrovně registrace se nepodařilo načíst">
               <p>{error}</p>
               <button type="button" className="btn btn-sm" onClick={() => void retry()}>
                 Zkusit znovu
               </button>
             </Alert>
           )}
-          {!plans && !error && <LoadingBlock label="Načítám plány…" />}
+          {!plans && !error && <LoadingBlock label="Načítám úrovně registrace…" />}
           {plans && (
             <div className="plans" ref={plansRef}>
               {plans.map((plan) => (

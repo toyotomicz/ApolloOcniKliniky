@@ -63,10 +63,10 @@ export function AdminMapPage() {
           </div>
           <div>
             <label htmlFor="map-plan" className="visually-hidden">
-              Plán
+              Úroveň registrace
             </label>
             <select id="map-plan" className="select" value={plan} onChange={(e) => update('plan', e.target.value)}>
-              <option value="">Všechny plány</option>
+              <option value="">Všechny úrovně</option>
               {plans?.map((p) => (
                 <option key={p.code} value={p.code}>
                   {p.name}

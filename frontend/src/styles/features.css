@@ -155,12 +155,23 @@
   display: grid;
   gap: var(--space-3);
 }
+/* Label and value on one line, full-width track below – readable even in a narrow card. */
 .hbar-list li {
   display: grid;
-  grid-template-columns: minmax(90px, 7.5rem) 1fr auto;
-  align-items: center;
-  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'label value' 'track track';
+  align-items: baseline;
+  gap: 6px var(--space-3);
   font-size: 0.9rem;
+}
+.hbar-label {
+  grid-area: label;
+  min-width: 0;
+}
+.hbar-track {
+  grid-area: track;
+  background: var(--color-surface-alt);
+  border-radius: 0 4px 4px 0;
 }
 .hbar-label {
   color: var(--color-ink);
@@ -177,9 +188,10 @@
   border-radius: 0 4px 4px 0;
 }
 .hbar-value {
+  grid-area: value;
   font-variant-numeric: tabular-nums;
   text-align: right;
-  min-width: 4.5rem;
+  font-weight: 600;
 }
 
 /* ---------- Message thread ---------- */
@@ -524,9 +536,7 @@ tr[data-selected='true'] td {
   min-height: 1.4em;
 }
 .metric .metric-label > span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
 }
 .metric .metric-hint {
   margin-top: auto;
@@ -566,17 +576,36 @@ a.metric-link:focus-visible {
 .metric-info .metric-value {
   color: var(--color-ink);
 }
+/* Five link tiles on a 6-column grid: a row of three and a row of two, both full width. */
 @media (max-width: 1100px) {
   .metric-grid.metric-grid-links {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .metric-grid.metric-grid-links > * {
+    grid-column: span 2;
+  }
+  .metric-grid.metric-grid-links > :nth-child(n + 4) {
+    grid-column: span 3;
   }
   .metric-grid.metric-grid-info {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* Phones: the first tile (all clinics) spans the row, the other four form a 2×2 grid. */
 @media (max-width: 600px) {
   .metric-grid.metric-grid-links {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .metric-grid.metric-grid-links > *,
+  .metric-grid.metric-grid-links > :nth-child(n + 4) {
+    grid-column: auto;
+  }
+  .metric-grid.metric-grid-links > :first-child {
+    grid-column: 1 / -1;
+  }
+  .metric-grid.metric-grid-links,
+  .metric-grid.metric-grid-info {
+    gap: var(--space-3);
   }
 }
 @media (prefers-reduced-motion: reduce) {

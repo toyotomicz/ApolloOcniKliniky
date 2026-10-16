@@ -60,7 +60,7 @@ public static class ClinicPortalEndpoints
         if (clinic is null) return ApiProblems.NotFound();
 
         var plan = PlanCatalog.Find(clinic.PlanCode);
-        if (plan is null) return ApiProblems.BadRequest("Plán kliniky již není podporován. Kontaktujte administrátora.", "unknown_plan");
+        if (plan is null) return ApiProblems.BadRequest("Úroveň registrace kliniky již není podporována. Kontaktujte administrátora.", "unknown_plan");
 
         var (valid, errors) = ClinicValidator.ValidateProfileUpdate(request, plan);
         if (valid is null) return ApiProblems.Validation(errors);

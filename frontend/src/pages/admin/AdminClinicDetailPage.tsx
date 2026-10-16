@@ -84,7 +84,7 @@ function ClinicDetailView({
         </div>
       </div>
 
-      <div className="portal-grid">
+      <div className="portal-grid detail-grid">
         <div className="stack">
           <ClinicDetails clinic={clinic} />
           <MessagesPanel clinicId={clinic.id} />
@@ -186,7 +186,7 @@ function DecisionPanel({ detail, onChange, onReload }: { detail: AdminClinicDeta
   }
 
   return (
-    <section className="card" aria-labelledby="decision-title">
+    <section className="card decision-panel" aria-labelledby="decision-title">
       <div className="card-header">
         <h2 id="decision-title">Rozhodnutí</h2>
       </div>
@@ -424,7 +424,7 @@ function NotesPanel({ detail, onChange }: { detail: AdminClinicDetail; onChange:
           </button>
         </form>
         {detail.notes.length === 0 ? (
-          <EmptyState title="Bez poznámek" icon={<NotebookPen size={28} aria-hidden="true" />} />
+          <EmptyState compact title="Bez poznámek" icon={<NotebookPen size={24} aria-hidden="true" />} />
         ) : (
           <div>
             {detail.notes.map((note) => (

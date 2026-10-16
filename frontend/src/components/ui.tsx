@@ -40,9 +40,9 @@ export function StatusBadge({ status }: { status: ClinicStatus }) {
   return <span className={`badge badge-dot badge-${status}`}>{statusLabels[status]}</span>
 }
 
-export function EmptyState({ title, children, icon }: { title: string; children?: ReactNode; icon?: ReactNode }) {
+export function EmptyState({ title, children, icon, compact }: { title: string; children?: ReactNode; icon?: ReactNode; compact?: boolean }) {
   return (
-    <div className="empty-state">
+    <div className={compact ? 'empty-state empty-state-compact' : 'empty-state'}>
       {icon ?? <Inbox size={40} aria-hidden="true" />}
       <h3>{title}</h3>
       {children}

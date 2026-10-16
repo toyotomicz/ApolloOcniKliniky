@@ -78,6 +78,10 @@ const statusFromDetail = (detail: string | null): string => {
   return target && target in statusLabels ? statusLabels[target].toLowerCase() : 'změněn'
 }
 
+/** Display names of the registration levels by their internal code (codes never change). */
+export const levelNames: Record<string, string> = { basic: 'Úroveň 1', standard: 'Úroveň 2', premium: 'Úroveň 3' }
+export const levelName = (code: string | null | undefined): string => (code ? (levelNames[code] ?? code) : '')
+
 const by = (item: { administratorUsername?: string | null }) => (item.administratorUsername ? ` (${item.administratorUsername})` : '')
 
 /** Czech names of audit events (mirrors AuditEndpoints.Labels on the server). */
@@ -128,7 +132,7 @@ export function describeAuditDetail(type: ActivityType, detail: string | null): 
       return `${from} → ${to}${flag === 'bulk' ? ' (hromadně)' : ''}`
     }
     case 'clinicRegistered':
-      return `plán ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+      return levelName(detail)
     case 'emailSent':
     case 'emailFailed':
       return emailKindLabels[detail.split(';')[0] ?? ''] ?? detail
@@ -156,7 +160,7 @@ export function describeAuditDetail(type: ActivityType, detail: string | null): 
 export function describeActivity(item: ActivityItem): string {
   switch (item.type) {
     case 'clinicRegistered':
-      return `Nová registrace${item.detail ? ` (plán ${item.detail.charAt(0).toUpperCase()}${item.detail.slice(1)})` : ''}`
+      return `Nová registrace${item.detail ? ` (${levelName(item.detail)})` : ''}`
     case 'clinicEmailVerified':
       return 'Ověřený e-mail'
     case 'clinicSignedIn':

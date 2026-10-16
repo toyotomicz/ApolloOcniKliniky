@@ -36,7 +36,7 @@ describe('Registration wizard', () => {
     await fillClinicStep(user)
     await user.click(screen.getByRole('button', { name: /Pokračovat/ }))
 
-    expect(await screen.findByRole('heading', { name: 'Údaje podle plánu' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Údaje podle úrovně' })).toBeInTheDocument()
     expect(screen.getByText('Provozní kontakt')).toBeInTheDocument()
     expect(screen.queryByText('Konfigurace služby')).not.toBeInTheDocument()
 
@@ -79,7 +79,7 @@ describe('Registration wizard', () => {
     renderRoute('/registrace?plan=basic')
     expect(await screen.findByText('Krok 2 z 3: Klinika a kontakt')).toBeInTheDocument()
     const steps = screen.getByRole('list', { name: 'Kroky registrace' })
-    expect(within(steps).queryByText('Údaje podle plánu')).not.toBeInTheDocument()
+    expect(within(steps).queryByText('Údaje podle úrovně')).not.toBeInTheDocument()
   })
 
   it('maps server-side field errors back to the right step', async () => {

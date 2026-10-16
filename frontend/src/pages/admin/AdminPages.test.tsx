@@ -49,7 +49,7 @@ describe('Admin dashboard', () => {
     expect(screen.getByText('86 %')).toBeInTheDocument()
     expect(screen.getByText('30,5 h')).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Počty klinik v jednotlivých krocích' })).getByText('83 %')).toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'Počty klinik podle plánu' })).toHaveTextContent('Premium')
+    expect(screen.getByRole('list', { name: 'Počty klinik podle úrovně registrace' })).toHaveTextContent('Premium')
     expect(screen.getAllByTestId('chart-bar')).toHaveLength(7)
     expect(screen.getByText('Zatím žádná aktivita')).toBeInTheDocument()
 

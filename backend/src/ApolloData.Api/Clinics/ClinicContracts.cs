@@ -68,7 +68,7 @@ public static class ClinicValidator
         var errors = new ValidationErrors();
 
         var plan = PlanCatalog.Find(request.PlanCode);
-        if (plan is null) errors.Add("planCode", "Vyberte jeden z nabízených plánů.");
+        if (plan is null) errors.Add("planCode", "Vyberte jednu z úrovní registrace.");
 
         var name = Rules.Required(errors, "name", request.Name, 200, minLength: 2);
         var organizationId = Rules.OrganizationId(errors, "organizationId", request.OrganizationId);

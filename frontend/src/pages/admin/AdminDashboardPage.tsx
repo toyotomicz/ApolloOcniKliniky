@@ -190,11 +190,11 @@ export function AdminDashboardPage() {
                 </section>
                 <section className="card" aria-labelledby="plans-title">
                   <div className="card-header">
-                    <h2 id="plans-title">Kliniky podle plánu</h2>
+                    <h2 id="plans-title">Kliniky podle úrovně</h2>
                   </div>
                   <div className="card-body">
                     <HorizontalBars
-                      label="Počty klinik podle plánu"
+                      label="Počty klinik podle úrovně registrace"
                       rows={data.plans.map((p) => ({
                         key: p.planCode,
                         label: p.planName,

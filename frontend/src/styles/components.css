@@ -712,3 +712,76 @@ legend {
   gap: var(--space-3);
   align-items: center;
 }
+
+/* Level choice: tagline, price and requirements on their own lines. */
+.radio-card-tagline,
+.radio-card-price {
+  display: block;
+}
+.radio-card-tagline {
+  margin-top: 2px;
+}
+.radio-card-price {
+  margin: var(--space-1) 0 2px;
+  font-weight: 600;
+  color: var(--color-ink-strong);
+}
+.radio-card .small {
+  display: block;
+}
+
+/* Small panels (notes, messages): an empty state must not dominate the card. */
+.empty-state.empty-state-compact {
+  padding: var(--space-4) var(--space-3);
+}
+.empty-state-compact svg {
+  margin-bottom: var(--space-2);
+}
+.empty-state-compact h3 {
+  font-size: 1rem;
+  margin-bottom: var(--space-1);
+}
+
+/* Responsive table cards: the main cell is the card title (no label, full width). */
+@media (max-width: 760px) {
+  .table-responsive tr {
+    position: relative;
+  }
+  .table-responsive td.td-main {
+    display: block;
+    text-align: left;
+    padding-bottom: var(--space-2);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .table-responsive td.td-main::before {
+    display: none;
+  }
+  /* Selection checkbox sits in the card corner instead of taking a labelled row. */
+  .table-responsive td.col-select {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-4);
+    padding: 0;
+  }
+  .table-responsive td.col-select::before {
+    display: none;
+  }
+  .table-responsive tr:has(td.col-select) td.td-main {
+    padding-right: 36px;
+  }
+}
+
+/* Definition lists in a narrow sidebar: label above value, so dates don't break per word. */
+@media (min-width: 961px) {
+  .portal-grid aside .dl-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .portal-grid aside .dl-grid dd {
+    margin-bottom: var(--space-3);
+  }
+  .portal-grid aside .dl-grid dd:last-child {
+    margin-bottom: 0;
+  }
+}
