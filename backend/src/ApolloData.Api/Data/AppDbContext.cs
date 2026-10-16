@@ -8,6 +8,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<ClinicLoginChallenge> ClinicLoginChallenges => Set<ClinicLoginChallenge>();
+    public DbSet<RegistrationEmailVerification> RegistrationEmailVerifications => Set<RegistrationEmailVerification>();
     public DbSet<Administrator> Administrators => Set<Administrator>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<ClinicStatusChange> ClinicStatusChanges => Set<ClinicStatusChange>();

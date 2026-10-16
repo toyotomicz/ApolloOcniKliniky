@@ -35,7 +35,7 @@ public sealed class WorkflowTests(ApiFactory factory)
         Assert.Contains("&lt;oftalmologie&gt;", sent.HtmlBody);
         Assert.DoesNotContain("<oftalmologie>", sent.HtmlBody);
 
-        var outbox = await factory.WithDbAsync(db => db.OutboundEmails.SingleAsync(e => e.ClinicId == clinicId));
+        var outbox = await factory.WithDbAsync(db => db.OutboundEmails.SingleAsync(e => e.ClinicId == clinicId && e.Kind == OutboundEmailKind.StatusChanged));
         Assert.NotNull(outbox.SentAt);
         Assert.True(await factory.WithDbAsync(db =>
             db.ActivityEvents.AnyAsync(e => e.ClinicId == clinicId && e.Type == ActivityEventType.EmailSent)));
@@ -85,7 +85,7 @@ public sealed class WorkflowTests(ApiFactory factory)
         await (await admin.PostAsync($"/api/admin/clinics/{clinicId}/status", new { status = "approved", version = await VersionAsync(admin, clinicId) }))
             .EnsureStatusAsync(HttpStatusCode.OK);
 
-        Assert.False(await factory.WithDbAsync(db => db.OutboundEmails.AnyAsync(e => e.ClinicId == clinicId)));
+        Assert.False(await factory.WithDbAsync(db => db.OutboundEmails.AnyAsync(e => e.ClinicId == clinicId && e.Kind == OutboundEmailKind.StatusChanged)));
     }
 
     [Fact]
@@ -208,7 +208,8 @@ public sealed class WorkflowTests(ApiFactory factory)
     {
         for (var i = 0; i < 200; i++)
         {
-            var rows = await factory.WithDbAsync(db => db.OutboundEmails.AsNoTracking().Where(e => e.ClinicId == clinicId).ToListAsync());
+            var rows = await factory.WithDbAsync(db => db.OutboundEmails.AsNoTracking()
+                .Where(e => e.ClinicId == clinicId && e.Kind == OutboundEmailKind.StatusChanged).ToListAsync());
             if (rows.FirstOrDefault(predicate) is { } row) return row;
             await Task.Delay(50);
         }

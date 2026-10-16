@@ -16,6 +16,8 @@ const valid: RegistrationFormValues = {
   street: 'Čáslavská 12',
   city: 'Ústí nad Labem',
   postalCode: '400 01',
+  publicContacts: { emails: [{ value: '' }], phones: [{ value: '377 123 456' }] },
+  authorityConfirmed: true,
   privacyNoticeAccepted: true,
 }
 
@@ -59,11 +61,38 @@ describe('registration schema', () => {
     expect(errorPaths(result)).toEqual(['serviceConfiguration.workplaceCount', 'serviceConfiguration.onboardingPreference'])
   })
 
+  it('requires the authority confirmation and at least one booking contact', () => {
+    const result = registrationSchema(basic).safeParse({
+      ...valid,
+      authorityConfirmed: false,
+      publicContacts: { emails: [{ value: '' }], phones: [{ value: ' ' }] },
+      website: 'neplatny web',
+    })
+    expect(errorPaths(result)).toEqual(expect.arrayContaining(['authorityConfirmed', 'publicContacts.phones.0.value', 'website']))
+
+    const emailOnly = registrationSchema(basic).safeParse({
+      ...valid,
+      publicContacts: { emails: [{ value: 'objednavky@example.cz' }], phones: [{ value: '' }] },
+      website: 'www.klinika.cz',
+    })
+    expect(emailOnly.success).toBe(true)
+  })
+
   it('builds an API payload without fields of groups the plan does not include', () => {
     const payload = toRegistrationPayload(
-      { ...valid, operationalContact: { name: 'Nemá se poslat', email: 'x@example.cz', phone: '' } },
+      {
+        ...valid,
+        operationalContact: { name: 'Nemá se poslat', email: 'x@example.cz', phone: '' },
+        publicContacts: { emails: [{ value: ' ' }], phones: [{ value: '377 123 456' }, { value: '' }] },
+      },
       basic,
+      'token-123',
     )
+    expect(payload.emailVerificationToken).toBe('token-123')
+    expect(payload.authorityConfirmed).toBe(true)
+    expect(payload.publicPhones).toEqual(['377 123 456'])
+    expect(payload.publicEmails).toEqual([])
+    expect(payload.website).toBeNull()
     expect(payload.operationalContact).toBeNull()
     expect(payload.serviceConfiguration).toBeNull()
     expect(payload.organizationId).toBe('25596641')

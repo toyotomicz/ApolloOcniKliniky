@@ -22,20 +22,25 @@ public sealed class RegistrationTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task Valid_registration_is_persisted_as_pending_with_utc_timestamp_and_sends_code()
+    public async Task Verified_registration_is_persisted_as_pending_signs_in_and_sends_confirmation_with_pdf()
     {
         using var client = factory.CreateTestClient();
         var email = Scenario.UniqueEmail();
 
-        var response = await client.PostAsync("/api/registrations", Scenario.Registration(email, "premium"));
+        var response = await Scenario.SubmitRegistrationAsync(factory, client, Scenario.Registration(email, "premium"));
 
         await response.EnsureStatusAsync(HttpStatusCode.Created);
         var json = await response.ReadJsonAsync();
-        Assert.True(json.GetProperty("verificationEmailSent").GetBoolean());
+        Assert.Equal(email, json.GetProperty("email").GetString());
 
         var clinic = await factory.WithDbAsync(db => db.Clinics.SingleAsync(c => c.NormalizedEmail == email.ToLowerInvariant()));
         Assert.Equal(ClinicStatus.Pending, clinic.Status);
-        Assert.Null(clinic.EmailVerifiedAt);
+        Assert.NotNull(clinic.EmailVerifiedAt);
+        Assert.NotNull(clinic.AuthorityConfirmedAt);
+        Assert.Equal(["377123456"], clinic.PublicPhones);
+        Assert.Equal(["objednavky@example.test"], clinic.PublicEmails);
+        Assert.Equal("https://www.ordinace-testovaci.cz", clinic.Website);
+        Assert.Equal("Objednávky po–pá 7–15 h.", clinic.PatientInfo);
         Assert.Equal(DateTimeKind.Utc, clinic.CreatedAt.Kind);
         Assert.Equal("premium", clinic.PlanCode);
         Assert.Equal("301 00", clinic.PostalCode);
@@ -44,7 +49,132 @@ public sealed class RegistrationTests(ApiFactory factory)
         Assert.NotNull(clinic.OperationalContact);
         Assert.Equal(4, clinic.ServiceConfiguration!.WorkplaceCount);
         Assert.Equal(OnboardingPreference.OnSite, clinic.ServiceConfiguration.OnboardingPreference);
-        Assert.Matches(@"^\d{6}$", factory.Email.LastCodeFor(email));
+
+        // The e-mail was verified up front, so the clinic is signed in right away.
+        await (await client.GetAsync("/api/clinic/me")).EnsureStatusAsync(HttpStatusCode.OK);
+        Assert.True(await factory.WithDbAsync(db => db.RegistrationEmailVerifications.AnyAsync(
+            v => v.NormalizedEmail == email && v.ConsumedAt != null)));
+
+        var confirmation = await factory.Email.WaitForAsync(m => m.ToEmail == email && m.Subject.Contains("přijata"));
+        var pdf = Assert.Single(confirmation.Attachments!);
+        Assert.Equal("application/pdf", pdf.ContentType);
+        Assert.Equal("%PDF"u8.ToArray(), pdf.Content[..4]);
+    }
+
+    [Fact]
+    public async Task Registration_without_verified_email_is_rejected()
+    {
+        using var client = factory.CreateTestClient();
+        var email = Scenario.UniqueEmail();
+
+        var missing = await client.PostAsync("/api/registrations", Scenario.Registration(email));
+        await missing.EnsureStatusAsync(HttpStatusCode.BadRequest);
+        var problem = await missing.ReadJsonAsync();
+        Assert.Equal("email_not_verified", problem.GetProperty("code").GetString());
+        Assert.True(problem.GetProperty("errors").TryGetProperty("email", out _));
+
+        // A token proves only the address it was issued for.
+        var otherToken = await Scenario.VerifyEmailAsync(factory, client, Scenario.UniqueEmail());
+        var body = Scenario.Registration(email);
+        body["emailVerificationToken"] = otherToken;
+        await (await client.PostAsync("/api/registrations", body)).EnsureStatusAsync(HttpStatusCode.BadRequest);
+        Assert.False(await factory.WithDbAsync(db => db.Clinics.AnyAsync(c => c.NormalizedEmail == email)));
+    }
+
+    [Fact]
+    public async Task Verification_token_expires()
+    {
+        using var client = factory.CreateTestClient();
+        var email = Scenario.UniqueEmail();
+        var body = Scenario.Registration(email);
+        body["emailVerificationToken"] = await Scenario.VerifyEmailAsync(factory, client, email);
+
+        factory.Time.Advance(TimeSpan.FromMinutes(121));
+
+        await (await client.PostAsync("/api/registrations", body)).EnsureStatusAsync(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Email_code_is_not_sent_to_a_registered_address()
+    {
+        using var client = factory.CreateTestClient();
+        var email = await Scenario.RegisterAsync(factory, client);
+
+        var response = await client.PostAsync("/api/registrations/email-code", new { email = email.ToUpperInvariant() });
+
+        await response.EnsureStatusAsync(HttpStatusCode.Conflict);
+        Assert.Equal("email_taken", (await response.ReadJsonAsync()).GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Email_code_is_stored_as_hash_and_locked_after_max_wrong_attempts()
+    {
+        using var client = factory.CreateTestClient();
+        var email = Scenario.UniqueEmail();
+        await (await client.PostAsync("/api/registrations/email-code", new { email })).EnsureStatusAsync(HttpStatusCode.Accepted);
+        var code = factory.Email.LastRegistrationCodeFor(email)!;
+
+        var stored = await factory.WithDbAsync(db => db.RegistrationEmailVerifications.SingleAsync(v => v.NormalizedEmail == email));
+        Assert.Equal(32, stored.CodeHash.Length);
+        Assert.DoesNotContain(code, Convert.ToHexString(stored.CodeHash));
+
+        var wrong = code == "000000" ? "111111" : "000000";
+        for (var i = 0; i < 5; i++)
+        {
+            await (await client.PostAsync("/api/registrations/email-code/verify", new { email, code = wrong }))
+                .EnsureStatusAsync(HttpStatusCode.BadRequest);
+        }
+        await (await client.PostAsync("/api/registrations/email-code/verify", new { email, code }))
+            .EnsureStatusAsync(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Email_code_resend_is_throttled_and_a_new_code_supersedes_the_old_one()
+    {
+        using var client = factory.CreateTestClient();
+        var email = Scenario.UniqueEmail();
+        await (await client.PostAsync("/api/registrations/email-code", new { email })).EnsureStatusAsync(HttpStatusCode.Accepted);
+        var first = factory.Email.LastRegistrationCodeFor(email);
+
+        var tooSoon = await client.PostAsync("/api/registrations/email-code", new { email });
+        await tooSoon.EnsureStatusAsync(HttpStatusCode.TooManyRequests);
+        Assert.Equal("code_throttled", (await tooSoon.ReadJsonAsync()).GetProperty("code").GetString());
+
+        factory.Time.Advance(TimeSpan.FromSeconds(61));
+        await (await client.PostAsync("/api/registrations/email-code", new { email })).EnsureStatusAsync(HttpStatusCode.Accepted);
+        var second = factory.Email.LastRegistrationCodeFor(email);
+
+        if (first != second)
+        {
+            await (await client.PostAsync("/api/registrations/email-code/verify", new { email, code = first }))
+                .EnsureStatusAsync(HttpStatusCode.BadRequest);
+        }
+        await (await client.PostAsync("/api/registrations/email-code/verify", new { email, code = second }))
+            .EnsureStatusAsync(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Public_contacts_are_validated()
+    {
+        using var client = factory.CreateTestClient();
+        var body = Scenario.Registration(Scenario.UniqueEmail());
+        body["publicPhones"] = new[] { "", " " };
+        body["publicEmails"] = Array.Empty<string>();
+        body["website"] = "neplatny web";
+
+        var none = await client.PostAsync("/api/registrations", body);
+        await none.EnsureStatusAsync(HttpStatusCode.BadRequest);
+        var errors = (await none.ReadJsonAsync()).GetProperty("errors");
+        Assert.True(errors.TryGetProperty("publicPhones.0", out _));
+        Assert.True(errors.TryGetProperty("website", out _));
+
+        body["publicPhones"] = new[] { "1", "377 123 456", "377 123 457", "377 123 458" };
+        body["publicEmails"] = new[] { "neni-email" };
+        var invalid = await client.PostAsync("/api/registrations", body);
+        var invalidErrors = (await invalid.ReadJsonAsync()).GetProperty("errors");
+        Assert.True(invalidErrors.TryGetProperty("publicPhones", out _));
+        Assert.True(invalidErrors.TryGetProperty("publicPhones.0", out _));
+        Assert.True(invalidErrors.TryGetProperty("publicEmails.0", out _));
     }
 
     [Fact]
@@ -60,11 +190,12 @@ public sealed class RegistrationTests(ApiFactory factory)
             phone = "12",
             postalCode = "1234",
             privacyNoticeAccepted = false,
+            authorityConfirmed = false,
         });
 
         await response.EnsureStatusAsync(HttpStatusCode.BadRequest);
         var errors = (await response.ReadJsonAsync()).GetProperty("errors");
-        foreach (var field in new[] { "planCode", "name", "organizationId", "email", "phone", "postalCode", "contactFirstName", "street", "city", "privacyNoticeAccepted" })
+        foreach (var field in new[] { "planCode", "name", "organizationId", "email", "phone", "postalCode", "contactFirstName", "street", "city", "privacyNoticeAccepted", "authorityConfirmed", "publicPhones.0" })
         {
             Assert.True(errors.TryGetProperty(field, out _), $"Expected an error for '{field}'.");
         }
@@ -110,7 +241,7 @@ public sealed class RegistrationTests(ApiFactory factory)
         body["operationalContact"] = new { name = "Nemá se uložit", email = "x@example.test" };
         body["serviceConfiguration"] = new { workplaceCount = 3, onboardingPreference = "online" };
 
-        var response = await client.PostAsync("/api/registrations", body);
+        var response = await Scenario.SubmitRegistrationAsync(factory, client, body);
 
         await response.EnsureStatusAsync(HttpStatusCode.Created);
         var clinic = await factory.WithDbAsync(db => db.Clinics.SingleAsync(c => c.NormalizedEmail == email));
@@ -137,42 +268,37 @@ public sealed class RegistrationTests(ApiFactory factory)
         var email = Scenario.UniqueEmail();
         var body = Scenario.Registration(email);
         body["status"] = "approved";
-        body["emailVerifiedAt"] = DateTime.UtcNow;
+        body["isDemo"] = true;
 
-        var response = await client.PostAsync("/api/registrations", body);
+        var response = await Scenario.SubmitRegistrationAsync(factory, client, body);
 
         await response.EnsureStatusAsync(HttpStatusCode.Created);
         var clinic = await factory.WithDbAsync(db => db.Clinics.SingleAsync(c => c.NormalizedEmail == email));
         Assert.Equal(ClinicStatus.Pending, clinic.Status);
-        Assert.Null(clinic.EmailVerifiedAt);
+        Assert.False(clinic.IsDemo);
     }
 
     [Fact]
-    public async Task Registration_survives_smtp_failure_and_reports_it()
+    public async Task Email_code_delivery_failure_is_reported_and_can_be_retried_immediately()
     {
         using var client = factory.CreateTestClient();
         var email = Scenario.UniqueEmail();
         factory.Email.Fail = true;
         try
         {
-            var response = await client.PostAsync("/api/registrations", Scenario.Registration(email));
-            await response.EnsureStatusAsync(HttpStatusCode.Created);
-            Assert.False((await response.ReadJsonAsync()).GetProperty("verificationEmailSent").GetBoolean());
-
-            var retry = await client.PostAsync("/api/clinic-auth/request-code", new { email });
-            await retry.EnsureStatusAsync(HttpStatusCode.ServiceUnavailable);
+            var response = await client.PostAsync("/api/registrations/email-code", new { email });
+            await response.EnsureStatusAsync(HttpStatusCode.ServiceUnavailable);
+            Assert.Equal("email_delivery_failed", (await response.ReadJsonAsync()).GetProperty("code").GetString());
         }
         finally
         {
             factory.Email.Fail = false;
         }
 
-        // The failed attempts left no usable code, and a retry now succeeds immediately (no cooldown).
-        var again = await client.PostAsync("/api/clinic-auth/request-code", new { email });
+        // The undelivered code does not count towards the cooldown.
+        var again = await client.PostAsync("/api/registrations/email-code", new { email });
         await again.EnsureStatusAsync(HttpStatusCode.Accepted);
-        Assert.Equal(1, factory.Email.CountFor(email));
-        Assert.Equal(1, await factory.WithDbAsync(db => db.ClinicLoginChallenges.CountAsync(
-            c => c.Clinic!.NormalizedEmail == email && c.DeliveredAt != null && c.InvalidatedAt == null)));
+        Assert.NotNull(factory.Email.LastRegistrationCodeFor(email));
     }
 
     [Fact]

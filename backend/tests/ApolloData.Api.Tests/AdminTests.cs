@@ -134,6 +134,7 @@ public sealed class AdminTests(ApiFactory factory)
         await (await clinicClient.PutAsync("/api/clinic/me", new
         {
             contactFirstName = "Jana", contactLastName = "Nová", phone = "777123456", street = "Ulice 1", city = "Plzeň", postalCode = "30100",
+            publicPhones = new[] { "377123456" },
         })).EnsureStatusAsync(HttpStatusCode.OK);
 
         var response = await admin.PostAsync($"/api/admin/clinics/{clinicId}/status",
@@ -169,7 +170,7 @@ public sealed class AdminTests(ApiFactory factory)
         {
             var email = Scenario.UniqueEmail();
             var body = Scenario.Registration(email, i == 0 ? "premium" : "basic", $"Klinika {marker} č. {i}");
-            await (await client.PostAsync("/api/registrations", body)).EnsureStatusAsync(HttpStatusCode.Created);
+            await (await Scenario.SubmitRegistrationAsync(factory, client, body)).EnsureStatusAsync(HttpStatusCode.Created);
         }
 
         using var admin = factory.CreateTestClient();

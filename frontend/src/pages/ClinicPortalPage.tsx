@@ -29,12 +29,12 @@ const statusCopy = {
 function StatusChecklist({ clinic }: { clinic: ClinicProfile }) {
   const reviewState = clinic.status === 'approved' ? 'done' : clinic.status === 'rejected' ? 'failed' : 'current'
   const items = [
-    { state: 'done', title: 'Registrace odeslána', meta: formatDateTime(clinic.createdAt) },
     {
       state: clinic.emailVerifiedAt ? 'done' : 'current',
       title: 'E-mail ověřen',
       meta: clinic.emailVerifiedAt ? formatDateTime(clinic.emailVerifiedAt) : 'Čeká na ověření',
     },
+    { state: 'done', title: 'Registrace odeslána', meta: formatDateTime(clinic.createdAt) },
     {
       state: reviewState,
       title: clinic.status === 'rejected' ? 'Posouzení: zamítnuto' : 'Posouzení administrátorem',

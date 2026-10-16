@@ -1,5 +1,6 @@
-import { useFormContext } from 'react-hook-form'
-import type { ContactFormValues } from '../lib/validation'
+import { Plus, X } from 'lucide-react'
+import { useFieldArray, useFormContext } from 'react-hook-form'
+import { MAX_PUBLIC_CONTACTS, type ContactFormValues } from '../lib/validation'
 import { Field } from './ui'
 
 // Field groups shared by the registration wizard and the clinic profile editor.
@@ -41,6 +42,81 @@ export function AddressFields() {
       <Field label="PSČ" error={errors.postalCode?.message} hint="5 číslic, např. 301 00">
         {(a) => <input {...a} {...register('postalCode')} className="input" inputMode="numeric" autoComplete="postal-code" />}
       </Field>
+    </div>
+  )
+}
+
+/** Booking contacts for patients: up to three phones and e-mails, website and further information. */
+export function PublicContactFields() {
+  const {
+    register,
+    formState: { errors },
+  } = useFormContext<ContactFormValues>()
+  return (
+    <div className="stack">
+      <div className="form-grid">
+        <ContactRows kind="phones" />
+        <ContactRows kind="emails" />
+      </div>
+      <div className="form-grid">
+        <Field label="Web" error={errors.website?.message} optional hint="Např. www.klinika.cz" className="span-2">
+          {(a) => <input {...a} {...register('website')} className="input" type="url" inputMode="url" autoComplete="url" />}
+        </Field>
+        <Field
+          label="Další informace pro pacienty"
+          error={errors.patientInfo?.message}
+          optional
+          hint="Např. ordinační hodiny nebo jak se objednat. Nevkládejte údaje o pacientech."
+          className="span-2"
+        >
+          {(a) => <textarea {...a} {...register('patientInfo')} className="textarea" maxLength={1000} />}
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function ContactRows({ kind }: { kind: 'phones' | 'emails' }) {
+  const {
+    register,
+    control,
+    formState: { errors },
+  } = useFormContext<ContactFormValues>()
+  const { fields, append, remove } = useFieldArray({ control, name: `publicContacts.${kind}` })
+  const rowErrors = errors.publicContacts?.[kind]
+  const phones = kind === 'phones'
+  return (
+    <div className="contact-rows">
+      {fields.map((row, index) => (
+        <div key={row.id} className="contact-row">
+          <Field
+            label={index === 0 ? (phones ? 'Telefon pro objednání' : 'E-mail pro objednání') : phones ? `Další telefon (${index + 1})` : `Další e-mail (${index + 1})`}
+            error={rowErrors?.[index]?.value?.message}
+            hint={index === 0 ? (phones ? 'Např. +420 377 123 456' : 'Např. objednavky@klinika.cz') : undefined}
+          >
+            {(a) => (
+              <input
+                {...a}
+                {...register(`publicContacts.${kind}.${index}.value`)}
+                className="input"
+                type={phones ? 'tel' : 'email'}
+                autoComplete="off"
+              />
+            )}
+          </Field>
+          {index > 0 && (
+            <button type="button" className="btn btn-ghost btn-sm contact-row-remove" onClick={() => remove(index)} aria-label={phones ? 'Odebrat telefon' : 'Odebrat e-mail'}>
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      ))}
+      {fields.length < MAX_PUBLIC_CONTACTS && (
+        <button type="button" className="btn-link small" onClick={() => append({ value: '' }, { shouldFocus: true })}>
+          <Plus size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />
+          {phones ? 'Přidat telefon' : 'Přidat e-mail'}
+        </button>
+      )}
     </div>
   )
 }

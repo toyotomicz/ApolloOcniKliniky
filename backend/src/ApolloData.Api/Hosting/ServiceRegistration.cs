@@ -70,6 +70,7 @@ public static class ServiceRegistration
         // --- Application services --------------------------------------------------------------
         services.AddSingleton<OtpCodeHasher>();
         services.AddScoped<ClinicOtpService>();
+        services.AddScoped<RegistrationEmailVerifier>();
         services.AddScoped<SessionService>();
         services.AddScoped<AdministratorAccounts>();
         services.AddScoped<DashboardService>();

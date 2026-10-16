@@ -49,6 +49,10 @@ public static class ConfirmationPdf
             ("Telefon", FormatPhone(clinic.Phone)),
             ("Úroveň registrace", plan is null ? clinic.PlanCode : $"{plan.Name} – {plan.Tagline}"),
         };
+        if (clinic.PublicPhones.Count > 0) rows.Add(("Telefon pro pacienty", string.Join(", ", clinic.PublicPhones.Select(FormatPhone))));
+        if (clinic.PublicEmails.Count > 0) rows.Add(("E-mail pro pacienty", string.Join(", ", clinic.PublicEmails)));
+        if (clinic.Website is not null) rows.Add(("Web", clinic.Website));
+        if (clinic.PatientInfo is not null) rows.Add(("Informace pro pacienty", clinic.PatientInfo));
         if (clinic.OperationalContact is { } oc)
         {
             rows.Add(("Provozní kontakt", $"{oc.Name}, {oc.Email}{(oc.Phone is null ? "" : $", {FormatPhone(oc.Phone)}")}"));
@@ -64,6 +68,7 @@ public static class ConfirmationPdf
         {
             ("Datum registrace", Local(clinic.CreatedAt)),
             ("Ověření e-mailu", clinic.EmailVerifiedAt is null ? "Zatím neověřen" : Local(clinic.EmailVerifiedAt)),
+            ("Oprávnění jednat", clinic.AuthorityConfirmedAt is null ? "—" : $"Potvrzeno {Local(clinic.AuthorityConfirmedAt)}"),
             ("Souhlas se zásadami", $"{Local(clinic.PrivacyNoticeAcceptedAt)} (verze {clinic.PrivacyNoticeVersion})"),
             ("Poslední změna stavu", Local(clinic.StatusChangedAt)),
         };

@@ -38,7 +38,8 @@ public sealed class UnitTests
     public void Czech_diacritics_are_preserved()
     {
         var request = new RegistrationRequest("basic", "Poliklinika Žluťoučký kůň", null, "Řehoř", "Šťastný",
-            "rehor@example.cz", "777123456", "Čáslavská 12", "Ústí nad Labem", "40001", null, null, true);
+            "rehor@example.cz", "777123456", "Čáslavská 12", "Ústí nad Labem", "40001", null, null, true,
+            AuthorityConfirmed: true, PublicPhones: ["777123456"]);
 
         var (result, errors) = ClinicValidator.ValidateRegistration(request);
 

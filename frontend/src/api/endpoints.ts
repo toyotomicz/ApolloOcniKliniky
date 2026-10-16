@@ -15,8 +15,9 @@ import type {
   PagedResult,
   Plan,
   ProfileUpdatePayload,
+  RegistrationCodeResponse,
+  RegistrationCodeVerifyResponse,
   RegistrationPayload,
-  RegistrationResponse,
   RequestCodeResponse,
   TwoFactorRequired,
   TwoFactorSetup,
@@ -35,7 +36,11 @@ function query(params: object): string {
 
 export const publicApi = {
   plans: () => http.get<Plan[]>('/api/plans'),
-  register: (payload: RegistrationPayload) => http.post<RegistrationResponse>('/api/registrations', payload),
+  sendRegistrationCode: (email: string, contactName: string) =>
+    http.post<RegistrationCodeResponse>('/api/registrations/email-code', { email, contactName }),
+  verifyRegistrationCode: (email: string, code: string) =>
+    http.post<RegistrationCodeVerifyResponse>('/api/registrations/email-code/verify', { email, code }),
+  register: (payload: RegistrationPayload) => http.post<ClinicProfile>('/api/registrations', payload),
 }
 
 export const clinicAuthApi = {

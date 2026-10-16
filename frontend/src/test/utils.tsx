@@ -116,4 +116,9 @@ export const pendingProfile = {
   createdAt: '2026-10-13T08:00:00Z',
   updatedAt: '2026-10-13T08:00:00Z',
   emailVerifiedAt: '2026-10-13T08:05:00Z',
+  publicEmails: ['objednavky@example.test'],
+  publicPhones: ['+420377123456'],
+  website: 'https://www.ordinace-testovaci.cz',
+  patientInfo: null,
+  authorityConfirmedAt: '2026-10-13T08:00:00Z',
 }

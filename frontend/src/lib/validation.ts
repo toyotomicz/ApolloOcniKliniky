@@ -52,6 +52,35 @@ const organizationId = z
   .string()
   .refine((v) => compact(v) === '' || isValidIco(compact(v)), 'IČO musí mít 8 číslic a platný kontrolní součet.')
 
+export function isValidWebsite(value: string): boolean {
+  if (/\s/.test(value)) return false
+  try {
+    const url = new URL(value.includes('://') ? value : `https://${value}`)
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.includes('.') && !url.hostname.endsWith('.')
+  } catch {
+    return false
+  }
+}
+
+/** Most booking e-mails / phones a clinic can publish (mirrors ClinicValidator.MaxPublicContacts). */
+export const MAX_PUBLIC_CONTACTS = 3
+
+// Booking contacts: empty rows are ignored, at least one phone or e-mail is required.
+const publicContactsSchema = z
+  .object({
+    emails: z.array(z.object({ value: optionalEmail })).max(MAX_PUBLIC_CONTACTS),
+    phones: z.array(z.object({ value: optionalPhone })).max(MAX_PUBLIC_CONTACTS),
+  })
+  .superRefine((value, ctx) => {
+    if (![...value.emails, ...value.phones].some((row) => row.value.trim() !== '')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['phones', 0, 'value'],
+        message: 'Uveďte alespoň jeden telefon nebo e-mail, na kterém se pacienti mohou objednat.',
+      })
+    }
+  })
+
 const operationalContactSchema = z.object({
   name: required(200),
   email: email(),
@@ -80,6 +109,13 @@ const contactShape = (plan: Plan | undefined) => ({
   street: required(200),
   city: required(100),
   postalCode,
+  publicContacts: publicContactsSchema,
+  website: z
+    .string()
+    .trim()
+    .max(300, 'Maximální délka je 300 znaků.')
+    .refine((v) => v === '' || isValidWebsite(v), 'Zadejte platnou adresu webu, např. www.klinika.cz.'),
+  patientInfo: z.string().max(1000, 'Maximální délka je 1000 znaků.'),
   operationalContact: groupSchema(plan, 'operationalContact', operationalContactSchema),
   serviceConfiguration: groupSchema(plan, 'serviceConfiguration', serviceConfigurationSchema),
 })
@@ -91,6 +127,7 @@ export function registrationSchema(plan: Plan | undefined) {
     organizationId,
     email: email(),
     ...contactShape(plan),
+    authorityConfirmed: z.literal(true, 'Pro registraci je nutné potvrdit oprávnění jednat jménem organizace.'),
     privacyNoticeAccepted: z.literal(true, 'Pro odeslání registrace je nutné potvrdit seznámení se zásadami zpracování údajů.'),
   })
 }
@@ -107,6 +144,10 @@ export interface ContactFormValues {
   street: string
   city: string
   postalCode: string
+  /** Rows of a field array (react-hook-form needs objects); empty rows are dropped on submit. */
+  publicContacts: { emails: { value: string }[]; phones: { value: string }[] }
+  website: string
+  patientInfo: string
   operationalContact: { name: string; email: string; phone: string }
   serviceConfiguration: {
     workplaceCount: string
@@ -121,6 +162,7 @@ export interface RegistrationFormValues extends ContactFormValues {
   name: string
   organizationId: string
   email: string
+  authorityConfirmed: boolean
   privacyNoticeAccepted: boolean
 }
 
@@ -131,11 +173,22 @@ export const emptyContact: ContactFormValues = {
   street: '',
   city: '',
   postalCode: '',
+  publicContacts: { emails: [{ value: '' }], phones: [{ value: '' }] },
+  website: '',
+  patientInfo: '',
   operationalContact: { name: '', email: '', phone: '' },
   serviceConfiguration: { workplaceCount: '', onboardingPreference: '', technicalContactEmail: '', notes: '' },
 }
 
 const orNull = (value: string) => (value.trim() === '' ? null : value.trim())
+const filled = (rows: { value: string }[]) => rows.map((row) => row.value.trim()).filter((value) => value !== '')
+
+/** Maps an API field path to the form path: "publicPhones.1" → "publicContacts.phones.1.value". */
+export function formFieldPath(field: string): string {
+  const match = /^public(Emails|Phones)(?:\.(\d+))?$/.exec(field)
+  if (!match) return field
+  return `publicContacts.${match[1] === 'Emails' ? 'emails' : 'phones'}.${match[2] ?? 0}.value`
+}
 
 function toContactPayload(values: ContactFormValues, plan: Plan | undefined): ProfileUpdatePayload {
   const oc = values.operationalContact
@@ -147,6 +200,10 @@ function toContactPayload(values: ContactFormValues, plan: Plan | undefined): Pr
     street: values.street.trim(),
     city: values.city.trim(),
     postalCode: values.postalCode.trim(),
+    publicEmails: filled(values.publicContacts.emails),
+    publicPhones: filled(values.publicContacts.phones),
+    website: orNull(values.website),
+    patientInfo: orNull(values.patientInfo),
     operationalContact: plan?.fieldGroups.includes('operationalContact')
       ? { name: oc.name.trim(), email: oc.email.trim(), phone: orNull(oc.phone) }
       : null,
@@ -162,13 +219,19 @@ function toContactPayload(values: ContactFormValues, plan: Plan | undefined): Pr
   }
 }
 
-export function toRegistrationPayload(values: RegistrationFormValues, plan: Plan | undefined): RegistrationPayload {
+export function toRegistrationPayload(
+  values: RegistrationFormValues,
+  plan: Plan | undefined,
+  emailVerificationToken: string | null,
+): RegistrationPayload {
   return {
     planCode: values.planCode,
     name: values.name.trim(),
     organizationId: orNull(compact(values.organizationId)),
     email: values.email.trim(),
+    authorityConfirmed: values.authorityConfirmed,
     privacyNoticeAccepted: values.privacyNoticeAccepted,
+    emailVerificationToken,
     ...toContactPayload(values, plan),
   }
 }

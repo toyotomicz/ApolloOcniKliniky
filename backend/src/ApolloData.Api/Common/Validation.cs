@@ -100,6 +100,24 @@ public static partial class Rules
         return compact;
     }
 
+    /// <summary>Optional public website. "www.klinika.cz" is accepted and stored as "https://www.klinika.cz".</summary>
+    public static string? Website(ValidationErrors errors, string field, string? value)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed)) return null;
+        var candidate = trimmed.Contains("://", StringComparison.Ordinal) ? trimmed : $"https://{trimmed}";
+        if (candidate.Length > 300
+            || !Uri.TryCreate(candidate, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || !uri.Host.Contains('.')
+            || uri.Host.EndsWith('.'))
+        {
+            errors.Add(field, "Zadejte platnou adresu webu, např. www.klinika.cz.");
+            return null;
+        }
+        return candidate;
+    }
+
     /// <summary>Czech postal code (PSČ), normalized to "123 45".</summary>
     public static string? PostalCode(ValidationErrors errors, string field, string? value)
     {

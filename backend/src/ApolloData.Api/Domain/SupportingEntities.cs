@@ -26,6 +26,38 @@ public sealed class ClinicLoginChallenge
     public DateTime? InvalidatedAt { get; set; }
 }
 
+/// <summary>
+/// Proof of e-mail ownership made before a registration exists. A one-time code is sent to the address;
+/// once confirmed, it is exchanged for a short-lived token that the final registration request must carry.
+/// Codes and tokens are stored only as HMAC hashes.
+/// </summary>
+public sealed class RegistrationEmailVerification
+{
+    public Guid Id { get; set; }
+    public required string NormalizedEmail { get; set; }
+
+    public required byte[] CodeHash { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+
+    /// <summary>Set once SMTP accepted the message. Undelivered codes can never be used.</summary>
+    public DateTime? DeliveredAt { get; set; }
+
+    public int AttemptCount { get; set; }
+
+    /// <summary>Set when superseded by a newer code or when delivery failed.</summary>
+    public DateTime? InvalidatedAt { get; set; }
+
+    /// <summary>Set when the correct code was entered; the token below is issued at the same moment.</summary>
+    public DateTime? VerifiedAt { get; set; }
+
+    public byte[]? TokenHash { get; set; }
+    public DateTime? TokenExpiresAt { get; set; }
+
+    /// <summary>Set when a registration was created with the token (a token works only once).</summary>
+    public DateTime? ConsumedAt { get; set; }
+}
+
 public sealed class Administrator
 {
     public Guid Id { get; set; }
@@ -135,6 +167,9 @@ public enum OutboundEmailKind
 {
     StatusChanged,
     NewMessage,
+
+    /// <summary>Sent after a registration was submitted; the confirmation PDF is attached when it is delivered.</summary>
+    RegistrationConfirmation,
 }
 
 /// <summary>

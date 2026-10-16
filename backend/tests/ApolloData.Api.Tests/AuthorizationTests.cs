@@ -84,6 +84,7 @@ public sealed class AuthorizationTests(ApiFactory factory)
             street = "Nová 5",
             city = "Brno",
             postalCode = "60200",
+            publicEmails = new[] { "objednavky@example.test" },
         });
         await update.EnsureStatusAsync(HttpStatusCode.OK);
 

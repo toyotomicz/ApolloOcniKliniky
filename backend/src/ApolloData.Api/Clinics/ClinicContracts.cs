@@ -25,7 +25,13 @@ public sealed record RegistrationRequest(
     string? PostalCode,
     OperationalContactInput? OperationalContact,
     ServiceConfigurationInput? ServiceConfiguration,
-    bool PrivacyNoticeAccepted);
+    bool PrivacyNoticeAccepted,
+    bool AuthorityConfirmed = false,
+    string? EmailVerificationToken = null,
+    IReadOnlyList<string?>? PublicEmails = null,
+    IReadOnlyList<string?>? PublicPhones = null,
+    string? Website = null,
+    string? PatientInfo = null);
 
 /// <summary>
 /// Fields a clinic may change itself. Name, IČO, email and plan are intentionally not editable
@@ -39,7 +45,14 @@ public sealed record UpdateClinicProfileRequest(
     string? City,
     string? PostalCode,
     OperationalContactInput? OperationalContact,
-    ServiceConfigurationInput? ServiceConfiguration);
+    ServiceConfigurationInput? ServiceConfiguration,
+    IReadOnlyList<string?>? PublicEmails = null,
+    IReadOnlyList<string?>? PublicPhones = null,
+    string? Website = null,
+    string? PatientInfo = null);
+
+/// <summary>Booking contacts published for patients.</summary>
+public sealed record PublicContactData(List<string> Emails, List<string> Phones, string? Website, string? PatientInfo);
 
 /// <summary>Validated, normalized contact data shared by registration and profile updates.</summary>
 public sealed record ValidatedContactData(
@@ -50,7 +63,8 @@ public sealed record ValidatedContactData(
     string City,
     string PostalCode,
     OperationalContact? OperationalContact,
-    ServiceConfiguration? ServiceConfiguration);
+    ServiceConfiguration? ServiceConfiguration,
+    PublicContactData PublicContacts);
 
 public sealed record ValidatedRegistration(
     PlanDefinition Plan,
@@ -62,6 +76,7 @@ public sealed record ValidatedRegistration(
 public static class ClinicValidator
 {
     public const int MaxWorkplaces = 500;
+    public const int MaxPublicContacts = 3;
 
     public static (ValidatedRegistration? Result, ValidationErrors Errors) ValidateRegistration(RegistrationRequest request)
     {
@@ -77,7 +92,13 @@ public static class ClinicValidator
         var contact = ValidateContact(errors, plan,
             request.ContactFirstName, request.ContactLastName, request.Phone,
             request.Street, request.City, request.PostalCode,
-            request.OperationalContact, request.ServiceConfiguration);
+            request.OperationalContact, request.ServiceConfiguration,
+            request.PublicEmails, request.PublicPhones, request.Website, request.PatientInfo);
+
+        if (!request.AuthorityConfirmed)
+        {
+            errors.Add("authorityConfirmed", "Pro registraci je nutné potvrdit oprávnění jednat jménem organizace.");
+        }
 
         if (!request.PrivacyNoticeAccepted)
         {
@@ -94,7 +115,8 @@ public static class ClinicValidator
         var contact = ValidateContact(errors, plan,
             request.ContactFirstName, request.ContactLastName, request.Phone,
             request.Street, request.City, request.PostalCode,
-            request.OperationalContact, request.ServiceConfiguration);
+            request.OperationalContact, request.ServiceConfiguration,
+            request.PublicEmails, request.PublicPhones, request.Website, request.PatientInfo);
         return (errors.IsValid ? contact : null, errors);
     }
 
@@ -103,7 +125,8 @@ public static class ClinicValidator
         PlanDefinition? plan,
         string? firstName, string? lastName, string? phone,
         string? street, string? city, string? postalCode,
-        OperationalContactInput? operational, ServiceConfigurationInput? service)
+        OperationalContactInput? operational, ServiceConfigurationInput? service,
+        IReadOnlyList<string?>? publicEmails, IReadOnlyList<string?>? publicPhones, string? website, string? patientInfo)
     {
         var first = Rules.Required(errors, "contactFirstName", firstName, 100);
         var last = Rules.Required(errors, "contactLastName", lastName, 100);
@@ -111,6 +134,7 @@ public static class ClinicValidator
         var normalizedStreet = Rules.Required(errors, "street", street, 200);
         var normalizedCity = Rules.Required(errors, "city", city, 100);
         var normalizedPostal = Rules.PostalCode(errors, "postalCode", postalCode);
+        var publicContacts = ValidatePublicContacts(errors, publicEmails, publicPhones, website, patientInfo);
 
         // Plan-specific groups are validated only when the plan requires them.
         // Data for groups that the plan does not include is ignored (never persisted).
@@ -128,7 +152,48 @@ public static class ClinicValidator
 
         if (!errors.IsValid) return null;
         return new ValidatedContactData(first!, last!, normalizedPhone!, normalizedStreet!, normalizedCity!, normalizedPostal!,
-            operationalContact, serviceConfiguration);
+            operationalContact, serviceConfiguration, publicContacts);
+    }
+
+    /// <summary>
+    /// Booking contacts for patients: up to three e-mails and phones (empty rows are ignored, duplicates removed),
+    /// at least one of them is required. Website and further information are optional.
+    /// </summary>
+    private static PublicContactData ValidatePublicContacts(
+        ValidationErrors errors, IReadOnlyList<string?>? emails, IReadOnlyList<string?>? phones, string? website, string? patientInfo)
+    {
+        var anyEntered = false;
+
+        var validEmails = new List<string>();
+        var emailInputs = emails ?? [];
+        if (emailInputs.Count > MaxPublicContacts) errors.Add("publicEmails", $"Uveďte nejvýše {MaxPublicContacts} e-maily.");
+        for (var i = 0; i < Math.Min(emailInputs.Count, MaxPublicContacts); i++)
+        {
+            if (string.IsNullOrWhiteSpace(emailInputs[i])) continue;
+            anyEntered = true;
+            var email = Rules.Email(errors, $"publicEmails.{i}", emailInputs[i], required: false);
+            if (email is not null && !validEmails.Contains(email, StringComparer.OrdinalIgnoreCase)) validEmails.Add(email);
+        }
+
+        var validPhones = new List<string>();
+        var phoneInputs = phones ?? [];
+        if (phoneInputs.Count > MaxPublicContacts) errors.Add("publicPhones", $"Uveďte nejvýše {MaxPublicContacts} telefony.");
+        for (var i = 0; i < Math.Min(phoneInputs.Count, MaxPublicContacts); i++)
+        {
+            if (string.IsNullOrWhiteSpace(phoneInputs[i])) continue;
+            anyEntered = true;
+            var phone = Rules.Phone(errors, $"publicPhones.{i}", phoneInputs[i], required: false);
+            if (phone is not null && !validPhones.Contains(phone)) validPhones.Add(phone);
+        }
+
+        if (!anyEntered)
+        {
+            errors.Add("publicPhones.0", "Uveďte alespoň jeden telefon nebo e-mail, na kterém se pacienti mohou objednat.");
+        }
+
+        var normalizedWebsite = Rules.Website(errors, "website", website);
+        var normalizedInfo = Rules.Optional(errors, "patientInfo", patientInfo, 1000);
+        return new PublicContactData(validEmails, validPhones, normalizedWebsite, normalizedInfo);
     }
 
     private static OperationalContact? ValidateOperationalContact(ValidationErrors errors, OperationalContactInput? input)
@@ -206,7 +271,12 @@ public sealed record ClinicProfileDto(
     DateTime? StatusChangedAt,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    DateTime? EmailVerifiedAt)
+    DateTime? EmailVerifiedAt,
+    IReadOnlyList<string> PublicEmails,
+    IReadOnlyList<string> PublicPhones,
+    string? Website,
+    string? PatientInfo,
+    DateTime? AuthorityConfirmedAt)
 {
     public static ClinicProfileDto From(Clinic clinic)
     {
@@ -225,6 +295,7 @@ public sealed record ClinicProfileDto(
                 ? new ServiceConfigurationDto(sc.WorkplaceCount, sc.OnboardingPreference, sc.TechnicalContactEmail, sc.Notes)
                 : null,
             clinic.Status, clinic.StatusMessage, clinic.StatusChangedAt,
-            clinic.CreatedAt, clinic.UpdatedAt, clinic.EmailVerifiedAt);
+            clinic.CreatedAt, clinic.UpdatedAt, clinic.EmailVerifiedAt,
+            clinic.PublicEmails, clinic.PublicPhones, clinic.Website, clinic.PatientInfo, clinic.AuthorityConfirmedAt);
     }
 }

@@ -160,10 +160,19 @@ public sealed partial class FakeEmailSender : IEmailSender
         return Task.CompletedTask;
     }
 
-    public string? LastCodeFor(string email)
+    /// <summary>The latest login code sent to the address.</summary>
+    public string? LastCodeFor(string email) => LastCode(email, "přihlašovací kód");
+
+    /// <summary>The latest e-mail verification code of a registration sent to the address.</summary>
+    public string? LastRegistrationCodeFor(string email) => LastCode(email, "ověřovací kód pro registraci");
+
+    public int LoginCodeCountFor(string email) => Sent.Count(m => string.Equals(m.ToEmail, email, StringComparison.OrdinalIgnoreCase)
+                                                                 && m.Subject.Contains("přihlašovací kód", StringComparison.Ordinal));
+
+    private string? LastCode(string email, string subject)
     {
         var message = Sent.LastOrDefault(m => string.Equals(m.ToEmail, email, StringComparison.OrdinalIgnoreCase)
-                                              && m.Subject.Contains("přihlašovací kód", StringComparison.Ordinal));
+                                              && m.Subject.Contains(subject, StringComparison.Ordinal));
         return message is null ? null : CodePattern().Match(message.TextBody).Value;
     }
 

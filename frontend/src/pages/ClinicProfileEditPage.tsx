@@ -7,12 +7,21 @@ import { ApiError } from '../api/client'
 import { clinicApi } from '../api/endpoints'
 import type { ClinicProfile, Plan } from '../api/types'
 import { useClinicSession } from '../auth/sessions'
-import { AddressFields, ContactPersonFields, OperationalContactFields, ServiceConfigurationFields } from '../components/ClinicFormFields'
+import {
+  AddressFields,
+  ContactPersonFields,
+  OperationalContactFields,
+  PublicContactFields,
+  ServiceConfigurationFields,
+} from '../components/ClinicFormFields'
 import { useToast } from '../components/Toast'
 import { Alert, DefinitionList, LoadingBlock, Spinner } from '../components/ui'
 import { formatPhone } from '../lib/format'
 import { usePlans } from '../lib/usePlans'
-import { profileSchema, toProfilePayload, type ContactFormValues } from '../lib/validation'
+import { formFieldPath, profileSchema, toProfilePayload, type ContactFormValues } from '../lib/validation'
+
+const rows = (values: string[], format: (value: string) => string = (v) => v) =>
+  values.length > 0 ? values.map((value) => ({ value: format(value) })) : [{ value: '' }]
 
 function toFormValues(clinic: ClinicProfile): ContactFormValues {
   return {
@@ -22,6 +31,9 @@ function toFormValues(clinic: ClinicProfile): ContactFormValues {
     street: clinic.street,
     city: clinic.city,
     postalCode: clinic.postalCode,
+    publicContacts: { emails: rows(clinic.publicEmails), phones: rows(clinic.publicPhones, formatPhone) },
+    website: clinic.website ?? '',
+    patientInfo: clinic.patientInfo ?? '',
     operationalContact: {
       name: clinic.operationalContact?.name ?? '',
       email: clinic.operationalContact?.email ?? '',
@@ -87,7 +99,7 @@ function ProfileForm({ clinic, plan }: { clinic: ClinicProfile; plan: Plan | und
         }
         setSubmitError(e.message)
         for (const [field, message] of Object.entries(e.fieldErrors)) {
-          form.setError(field as Path<ContactFormValues>, { type: 'server', message })
+          form.setError(formFieldPath(field) as Path<ContactFormValues>, { type: 'server', message })
         }
       } else {
         setSubmitError('Údaje se nepodařilo uložit.')
@@ -122,6 +134,13 @@ function ProfileForm({ clinic, plan }: { clinic: ClinicProfile; plan: Plan | und
             Adresa kliniky
           </h2>
           <AddressFields />
+
+          <hr className="divider" />
+          <h2 className="section-title">Kontakty pro pacienty</h2>
+          <p className="muted small" style={{ marginTop: -8 }}>
+            Telefony, e-maily a další informace, které budou sloužit pacientům k objednání.
+          </p>
+          <PublicContactFields />
 
           {plan?.fieldGroups.includes('operationalContact') && (
             <>

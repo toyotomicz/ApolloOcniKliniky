@@ -1,6 +1,7 @@
 using System.Net;
 using ApolloData.Api.Admin;
 using ApolloData.Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace ApolloData.Api.Tests;
 
@@ -18,7 +19,10 @@ public sealed class DashboardTests(ApiFactory factory)
         using var clinicClient = factory.CreateTestClient();
         var (_, clinicId) = await Scenario.RegisterAndSignInAsync(factory, clinicClient);
         using var unverifiedClient = factory.CreateTestClient();
-        await Scenario.RegisterAsync(factory, unverifiedClient);
+        var unverifiedEmail = await Scenario.RegisterAsync(factory, unverifiedClient);
+        // Registrations are verified up front now; clinics registered before that may still be unverified.
+        await factory.WithDbAsync(db => db.Clinics.Where(c => c.NormalizedEmail == unverifiedEmail)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.EmailVerifiedAt, (DateTime?)null)));
 
         await (await clinicClient.PostAsync("/api/clinic/messages", new { body = "Dotaz k registraci" })).EnsureStatusAsync(HttpStatusCode.Created);
 
@@ -35,7 +39,7 @@ public sealed class DashboardTests(ApiFactory factory)
         Assert.Equal(1, Delta("pendingReview"));
         Assert.Equal(1, Delta("approved"));
         Assert.Equal(0, Delta("rejected"));
-        Assert.Equal(1, Delta("uniqueClinicSignInsToday"));
+        Assert.Equal(2, Delta("uniqueClinicSignInsToday"));
         Assert.Equal(1, Delta("emailUnverified"));
         Assert.Equal(1, Delta("unreadMessages"));
         Assert.Equal(System.Text.Json.JsonValueKind.Number, m1.GetProperty("averageDecisionHours").ValueKind);

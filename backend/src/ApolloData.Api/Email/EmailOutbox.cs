@@ -1,5 +1,7 @@
 using ApolloData.Api.Common;
 using ApolloData.Api.Data;
+using ApolloData.Api.Admin;
+using ApolloData.Api.Documents;
 using ApolloData.Api.Domain;
 using MailKit.Net.Smtp;
 using Microsoft.EntityFrameworkCore;
@@ -111,7 +113,9 @@ internal sealed class EmailOutboxWorker(
             email.Attempts++;
             try
             {
-                await sender.SendAsync(new EmailMessage(email.ToEmail, email.ToName, email.Subject, email.TextBody, email.HtmlBody), ct);
+                var message = new EmailMessage(email.ToEmail, email.ToName, email.Subject, email.TextBody, email.HtmlBody,
+                    await AttachmentsAsync(services, db, email, ct));
+                await sender.SendAsync(message, ct);
                 email.SentAt = time.GetUtcNow().UtcDateTime;
                 email.LastError = null;
                 db.Record(ActivityEventType.EmailSent, email.SentAt.Value, email.ClinicId, detail: email.Kind.ToString());
@@ -137,6 +141,23 @@ internal sealed class EmailOutboxWorker(
             await db.SaveChangesAsync(ct);
         }
         return due.Count;
+    }
+
+    /// <summary>
+    /// The registration confirmation carries the PDF overview. It is generated when the e-mail is sent
+    /// (nothing binary is stored in the outbox); if the clinic was deleted meanwhile, the e-mail goes without it.
+    /// </summary>
+    private static async Task<IReadOnlyList<EmailAttachment>?> AttachmentsAsync(
+        IServiceProvider services, AppDbContext db, OutboundEmail email, CancellationToken ct)
+    {
+        if (email.Kind != OutboundEmailKind.RegistrationConfirmation || email.ClinicId is not { } clinicId) return null;
+        var clinic = await db.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId, ct);
+        if (clinic is null) return null;
+
+        var app = services.GetRequiredService<AppInfo>();
+        var clock = services.GetRequiredService<ReportingClock>();
+        var pdf = ConfirmationPdf.Generate(clinic, app.Name, clock.UtcNow, clock.TimeZone);
+        return [new EmailAttachment(ConfirmationPdf.FileName(clinic), "application/pdf", pdf)];
     }
 
     private static string Describe(EmailDeliveryException ex)
