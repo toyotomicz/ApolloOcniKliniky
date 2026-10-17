@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/toyotomicz/ApolloOcniKliniky/actions/workflows/ci.yml/badge.svg)](https://github.com/toyotomicz/ApolloOcniKliniky/actions/workflows/ci.yml)
 
-Full-stack webová aplikace pro registraci **očních klinik**. Klinika si na veřejné stránce vybere plán, zaregistruje se,
-přihlašuje se jednorázovým kódem z e-mailu (bez hesla) a v portálu sleduje stav registrace, komunikuje
-s administrátorem a stahuje potvrzení v PDF. Administrátor registrace posuzuje – jednotlivě i hromadně – a má
+Full-stack webová aplikace pro registraci **očních klinik**. Klinika se na veřejné stránce zaregistruje ve čtyřech
+krocích (kontakt a organizace → ověření e-mailu kódem a volba úrovně → veřejné kontakty pro pacienty → souhrn
+a odeslání), dostane potvrzení s PDF přehledem, přihlašuje se jednorázovým kódem z e-mailu (bez hesla) a v portálu
+sleduje stav registrace, komunikuje s administrátorem a stahuje potvrzení v PDF. Administrátor registrace posuzuje – jednotlivě i hromadně – a má
 k dispozici přehled se statistikami, mapu klinik, audit log s exportem, notifikace v reálném čase a dvoufázové
 přihlášení přes Google Authenticator.
 
@@ -16,8 +17,8 @@ Vzhled (barvy, písma) je sladěný s webem [apollodata.cz](https://www.apolloda
 | **Repozitář** | https://github.com/toyotomicz/ApolloOcniKliniky (soukromý) |
 | **Technologie** | .NET 10 · ASP.NET Core · EF Core · PostgreSQL 17 · React 19 · TypeScript · Vite · Docker |
 
-> **Nezávislý projekt.** Nejde o oficiální službu ani integraci VZP či jiné instituce. Názvy a obsah plánů jsou
-> provizorní a bez cen. Aplikace nezpracovává žádné údaje o pacientech.
+> **Nezávislý projekt.** Nejde o oficiální službu ani integraci VZP či jiné instituce. Obsah úrovní registrace
+> (texty a ceny) je provizorní. Aplikace nezpracovává žádné údaje o pacientech.
 
 ---
 
@@ -46,23 +47,31 @@ Vzhled (barvy, písma) je sladěný s webem [apollodata.cz](https://www.apolloda
 
 ### Pro kliniky
 
-- **Úvodní stránka** se třemi plány (Basic / Standard / Premium) a decentními animacemi.
-- **Průvodce registrací** – kroky určuje zvolený plán: Standard přidává provozní kontakt, Premium navíc konfiguraci
-  služby (počet pracovišť, forma úvodního nastavení, technický kontakt). Validace na klientu i serveru, kontrola IČO.
+- **Úvodní stránka** se sekcí „Jak to funguje“ a třemi úrovněmi registrace (Úroveň 1 / 2 / 3; interně
+  `basic` / `standard` / `premium`) a decentními animacemi.
+- **Registrace ve čtyřech krocích** (přesně podle sekce „Jak to funguje“):
+  1. **Kontakt a organizace** – název, IČO (kontrolní součet), e-mail, kontaktní osoba, adresa a povinné potvrzení
+     **oprávnění jednat jménem organizace**.
+  2. **Ověření e-mailu a úroveň** – na e-mail přijde ověřovací kód (PIN) ještě **před** vznikem registrace;
+     po ověření se volí úroveň (karty s cenou).
+  3. **Veřejné kontakty** – až 3 telefony a 3 e-maily pro objednání pacientů (alespoň jeden je povinný), web
+     a další informace; úroveň 2 přidává provozní kontakt, úroveň 3 navíc konfiguraci služby.
+  4. **Souhrn a odeslání** – po odeslání je klinika rovnou přihlášená a přijde jí **potvrzení s PDF přehledem**.
+  Validace na klientu i serveru.
 - **Přihlášení bez hesla** – šestimístný jednorázový kód z e-mailu.
-- **Portál kliniky** – stav a průběh registrace, zpráva/důvod od administrátora, úprava kontaktních údajů,
-  **zprávy s administrátorem** a **potvrzení o registraci v PDF**.
-- **E-maily** – přihlašovací kód, oznámení o schválení / zamítnutí / vrácení k posouzení (s důvodem) a upozornění
-  na novou zprávu od administrátora.
+- **Portál kliniky** – stav a průběh registrace, zpráva/důvod od administrátora, úprava kontaktních údajů
+  včetně veřejných kontaktů, **zprávy s administrátorem** a **potvrzení o registraci v PDF**.
+- **E-maily** – ověřovací kód při registraci, potvrzení registrace s PDF, přihlašovací kód, oznámení o schválení /
+  zamítnutí / vrácení k posouzení (s důvodem) a upozornění na novou zprávu od administrátora.
 
 ### Pro administrátory
 
 - **Přehled** – metriky (registrace, nové dnes, čekající, schválené, zamítnuté, nepřečtené zprávy, průměrná doba
   do rozhodnutí, míra schválení, přihlášené kliniky dnes), graf registrací za 7 / 30 dní, průchod registrací
-  (registrace → ověřený e-mail → schválení), rozdělení podle plánů a poslední aktivita.
-- **Kliniky** – vyhledávání (název, e-mail, město, IČO), filtry podle stavu, plánu a nepřečtených zpráv, řazení,
+  (registrace → ověřený e-mail → schválení), rozdělení podle úrovní a poslední aktivita.
+- **Kliniky** – vyhledávání (název, e-mail, město, IČO), filtry podle stavu, úrovně a nepřečtených zpráv, řazení,
   stránkování a **hromadné akce** (schválit / zamítnout / vrátit k posouzení / smazat vybrané kliniky v jedné transakci).
-- **Detail kliniky** – všechny údaje, rozhodnutí s potvrzením (zamítnutí vyžaduje důvod), historie stavů,
+- **Detail kliniky** – všechny údaje (včetně kontaktů pro pacienty a potvrzeného oprávnění jednat), rozhodnutí s potvrzením (zamítnutí vyžaduje důvod), historie stavů,
   interní poznámky, **konverzace s klinikou**, mapa polohy (lze zvětšit), PDF potvrzení, odkaz do audit logu
   a **trvalé smazání kliniky** (s potvrzením; v audit logu zůstane záznam „Smazání kliniky“).
 - **Mapa klinik** – OpenStreetMap, barva značky podle stavu, filtry, proklik na detail, zvětšení na celou obrazovku.
@@ -97,10 +106,10 @@ flowchart LR
     browser -. "mapové dlaždice" .-> tiles
     web --> api
     api --> db
-    api -- "kód pro přihlášení" --> smtp
+    api -- "kódy: ověření při registraci, přihlášení" --> smtp
     api --- outbox
     api --- geo
-    outbox -- "e-maily o stavu a zprávách" --> smtp
+    outbox -- "potvrzení registrace (PDF), stav, zprávy" --> smtp
     outbox --> db
     geo --> nominatim
     geo --> db
@@ -123,10 +132,10 @@ apollo/
 │  ├─ src/ApolloData.Api/
 │  │  ├─ Domain/          entity (Clinic, ClinicMessage, OutboundEmail, Administrator, ActivityEvent, …)
 │  │  ├─ Data/            DbContext, Fluent API konfigurace, migrace, zápis do audit logu
-│  │  ├─ Plans/           PlanCatalog – jediný zdroj definic plánů
+│  │  ├─ Plans/           PlanCatalog – jediný zdroj definic úrovní registrace
 │  │  ├─ Clinics/         registrace, portál kliniky, validace, DTO
 │  │  ├─ Messages/        konverzace klinika ↔ administrátor
-│  │  ├─ Auth/            jednorázové kódy, relace, 2FA (TOTP, záložní kódy), administrátorské účty
+│  │  ├─ Auth/            jednorázové kódy (přihlášení i ověření e-mailu při registraci), relace, 2FA, účty administrátorů
 │  │  ├─ Admin/           přehled, seznam/detail, změny stavu, hromadné akce, audit log + CSV
 │  │  ├─ Realtime/        SignalR hub a notifikace pro administrátory
 │  │  ├─ Documents/       PDF potvrzení (QuestPDF)
@@ -146,14 +155,19 @@ apollo/
 
 ### Klíčová rozhodnutí
 
-- **Plány na jednom místě** – `Plans/PlanCatalog.cs`. Frontend z `GET /api/plans` vykresluje karty i kroky
-  registrace, backend podle stejného katalogu validuje.
+- **Úrovně registrace na jednom místě** – `Plans/PlanCatalog.cs`. Frontend z `GET /api/plans` vykresluje karty
+  i pole podle úrovně, backend podle stejného katalogu validuje. Zobrazované názvy jsou „Úroveň 1–3“, interní
+  kódy `basic` / `standard` / `premium` se nemění.
+- **E-mail ověřený před registrací** – `POST /api/registrations/email-code` pošle kód, `…/verify` ho vymění za
+  jednorázový token (platí 2 h, v databázi jen HMAC) a `POST /api/registrations` bez platného tokenu pro stejnou
+  adresu neprojde. Registrace tak vzniká rovnou s ověřeným e-mailem a klinika je po odeslání přihlášená.
 - **Serverové relace** – HttpOnly cookie nese jen ID relace, která se při každém požadavku ověřuje v databázi,
   takže odhlášení a odvolání platí okamžitě. Klinika a administrátor mají oddělená cookie schémata.
 - **Žádná ID v URL kliniky** – endpointy kliniky určují kliniku vždy ze serverové relace, klinika tedy nemůže
   adresovat cizí data.
-- **Transakční outbox pro e-maily** – e-mail o změně stavu se zapíše do tabulky `OutboundEmails` ve stejné
-  transakci jako změna; odešle ho worker na pozadí a při chybě opakuje. Výpadek Gmailu nic neztratí.
+- **Transakční outbox pro e-maily** – e-mail o změně stavu i potvrzení registrace se zapíše do tabulky
+  `OutboundEmails` ve stejné transakci jako změna; odešle ho worker na pozadí a při chybě opakuje. Výpadek Gmailu
+  nic neztratí. PDF přílohu potvrzení vygeneruje worker až při odeslání (v databázi se neukládá).
 - **Realtime jen jako signál** – SignalR posílá jen „něco se změnilo“; data se vždy načítají přes REST API
   se stejnou autorizací.
 - **Audit log jako jediný zdroj historie** – všechny akce (i systémové) se zapisují do `ActivityEvents`;
@@ -167,6 +181,7 @@ erDiagram
     Clinics ||--o{ AdminNotes : "interní poznámky"
     Clinics ||--o{ ClinicMessages : "konverzace"
     Clinics ||--o{ ClinicLoginChallenges : "kódy (jen HMAC)"
+    RegistrationEmailVerifications }o..o| Clinics : "ověření e-mailu před registrací (podle adresy)"
     Clinics ||--o{ UserSessions : "relace kliniky"
     Clinics |o--o{ OutboundEmails : "odchozí e-maily"
     Clinics |o--o{ ActivityEvents : "audit"
@@ -180,8 +195,13 @@ erDiagram
         uuid Id PK
         string Name
         string NormalizedEmail UK
-        string PlanCode
+        string PlanCode "basic, standard, premium"
         string Status "Pending, Approved, Rejected"
+        text_array PublicPhones "kontakty pro pacienty"
+        text_array PublicEmails
+        string Website
+        timestamptz EmailVerifiedAt
+        timestamptz AuthorityConfirmedAt "oprávnění jednat"
         double Latitude "z geokódování"
         double Longitude
         bool IsDemo
@@ -196,7 +216,7 @@ erDiagram
     }
     OutboundEmails {
         uuid Id PK
-        string Kind "StatusChanged, NewMessage"
+        string Kind "StatusChanged, NewMessage, RegistrationConfirmation"
         int Attempts
         timestamptz NextAttemptAt
         timestamptz SentAt
@@ -210,6 +230,15 @@ erDiagram
         string TwoFactorSecret "šifrováno Data Protection"
         bigint TwoFactorLastTimeStep "ochrana proti replay"
     }
+    RegistrationEmailVerifications {
+        uuid Id PK
+        string NormalizedEmail
+        bytea CodeHash "HMAC"
+        int AttemptCount
+        timestamptz VerifiedAt
+        bytea TokenHash "HMAC, platnost 2 h"
+        timestamptz ConsumedAt "token jen jednou"
+    }
     ActivityEvents {
         bigint Id PK
         string Type
@@ -222,7 +251,7 @@ erDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending: registrace (ověřovací kód e-mailem)
+    [*] --> Pending: registrace (e-mail ověřen kódem předem)
     Pending --> Approved: administrátor schválí
     Pending --> Rejected: administrátor zamítne (důvod povinný)
     Approved --> Pending: vrátit k posouzení
@@ -230,10 +259,35 @@ stateDiagram-v2
     Approved --> Rejected
     Rejected --> Approved
     note right of Pending
-        Ověření e-mailu je nezávislé na schválení.
+        Schválení je vždy ruční (ověřený e-mail nestačí).
         Každá změna: historie + audit + e-mail klinice
         (jedna transakce), hromadně i jednotlivě.
     end note
+```
+
+### Registrace kliniky
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor K as Klinika
+    participant SPA
+    participant API
+    participant DB as PostgreSQL
+    participant G as Gmail SMTP
+    K->>SPA: krok 1 – organizace, kontakt, potvrzení oprávnění
+    SPA->>API: POST /api/registrations/email-code
+    API->>DB: HMAC(kód), platnost 10 min (409, je-li e-mail už registrován)
+    API->>G: e-mail s ověřovacím kódem
+    K->>SPA: krok 2 – kód (PIN) + volba úrovně
+    SPA->>API: POST /api/registrations/email-code/verify
+    API->>DB: atomická kontrola (max. 5 pokusů) → HMAC(token), platnost 2 h
+    API-->>SPA: jednorázový token
+    K->>SPA: krok 3 – veřejné kontakty, údaje podle úrovně; krok 4 – souhrn
+    SPA->>API: POST /api/registrations (+ token)
+    API->>DB: jedna transakce: klinika (e-mail ověřen) + spotřeba tokenu + audit + řádek v OutboundEmails
+    API-->>SPA: 201 + HttpOnly cookie s ID relace (klinika je přihlášená)
+    API->>G: (outbox) potvrzení registrace s PDF přehledem
 ```
 
 ### Přihlášení kliniky kódem z e-mailu
@@ -465,7 +519,9 @@ Pokročilé (proměnné prostředí / `appsettings.json`): `Auth__OtpLifetimeMin
 
 | E-mail | Kdy | Jak se odesílá |
 |---|---|---|
-| Přihlašovací kód | registrace, žádost o kód | ihned; při chybě dostane uživatel hlášku a může kód poslat znovu |
+| Ověřovací kód (PIN) | registrace, krok 1 → 2 | ihned; při chybě hláška a nové odeslání bez čekání. E-mail neobsahuje žádný text zadaný uživatelem |
+| Potvrzení registrace + PDF | odeslání registrace | přes outbox; PDF přehled vyplněných údajů v příloze |
+| Přihlašovací kód | žádost o kód na stránce přihlášení | ihned; při chybě dostane uživatel hlášku a může kód poslat znovu |
 | Změna stavu registrace | schválení, zamítnutí (s důvodem), vrácení k posouzení – i hromadně | přes outbox, až 6 pokusů s rostoucím odstupem |
 | Nová zpráva | administrátor napíše klinice | přes outbox; text zprávy v e-mailu **není** (čte se v portálu) |
 
@@ -496,7 +552,7 @@ Tajné klíče 2FA jsou šifrované klíči Data Protection ve volume `api-keys`
 
 ## Demo data
 
-Pro prezentaci lze nahrát **45 realistických očních klinik po celé ČR** – různé plány a stavy, historie rozhodnutí,
+Pro prezentaci lze nahrát **45 realistických očních klinik po celé ČR** – různé úrovně a stavy, historie rozhodnutí,
 interní poznámky, konverzace (některé nepřečtené) a aktivita za posledních ~6 týdnů. Všechny mají polohu na mapě.
 
 | Akce | Lokálně | Na serveru |
@@ -512,10 +568,12 @@ označené štítkem „Demo data“. Skutečných registrací se příkazy nedo
 
 ## Ukázkový scénář
 
-1. Otevřete úvodní stránku → „Zvolit Standard“ → vyplňte údaje (IČO `25596641` má platný kontrolní součet,
-   adresa např. `Americká 42, 301 00 Plzeň`) a s vlastní e-mailovou adresou registraci odešlete.
-2. Ve druhém okně mějte otevřenou administraci – **nová registrace se ihned ohlásí** a přehled i seznam se obnoví.
-3. Zadejte kód z e-mailu → otevře se **portál kliniky**. Napište administrátorovi zprávu, stáhněte **potvrzení v PDF**.
+1. Ve druhém okně mějte otevřenou administraci.
+2. Úvodní stránka → „Jak to funguje“ → u úrovně 2 „Zvolit“ → vyplňte organizaci a kontakt s vlastní e-mailovou
+   adresou (IČO `25596641` má platný kontrolní součet, adresa např. `Americká 42, 301 00 Plzeň`), potvrďte
+   oprávnění → **zadejte kód z e-mailu** → doplňte kontakty pro pacienty a provozní kontakt → odešlete.
+   **Nová registrace se v administraci ihned ohlásí**, klinice přijde potvrzení s PDF.
+3. Z obrazovky „Registrace byla odeslána“ přejděte do **portálu kliniky**. Napište administrátorovi zprávu.
 4. V administraci: upozornění „Nová zpráva“ → detail kliniky → odpovězte (klinice přijde e-mail) a **schvalte**
    registraci (přijde e-mail o schválení). Za chvíli se klinika objeví na **mapě**.
 5. **Kliniky** → zaškrtněte několik demo klinik → **hromadné schválení**.
@@ -571,19 +629,21 @@ cd backend && dotnet test
 cd frontend && npm test
 ```
 
-- **Backend – 92 testů.** Integrační testy běží proti skutečnému PostgreSQL v Testcontainers (vyžaduje Docker).
+- **Backend – 101 testů.** Integrační testy běží proti skutečnému PostgreSQL v Testcontainers (vyžaduje Docker).
   E-mail nahrazuje falešný odesílatel, geokódování falešný geokodér a čas `FakeTimeProvider` – testy nikdy
   nepoužívají Gmail ani internet.
-- **Frontend – 26 testů** (Vitest + React Testing Library), plus `npm run lint` (oxlint) a `npm run typecheck`.
+- **Frontend – 28 testů** (Vitest + React Testing Library), plus `npm run lint` (oxlint) a `npm run typecheck`.
 - **GitHub Actions** (`.github/workflows/ci.yml`) při každém pushi do `main` a každém pull requestu spustí build
   a testy backendu (varování = chyby), lint, typovou kontrolu, testy a build frontendu a sestavení Docker obrazů.
 
-Co testy pokrývají (výběr): validace registrace a plánových polí, IČO, jednorázové kódy (hash, expirace, opakované
-použití, limity, výpadek SMTP), relace, CSRF, vlastnictví dat, autorizace, zámek účtu, schválení a zamítnutí
+Co testy pokrývají (výběr): validace registrace a polí podle úrovně, IČO, veřejné kontakty a web, ověření e-mailu
+před registrací (kód, token vázaný na adresu, expirace, jednorázovost), potvrzení s PDF přílohou (PDF se vejde na
+jednu stranu), jednorázové kódy (hash, expirace, opakované použití, limity, výpadek SMTP), stránkování s extrémními
+hodnotami, relace, CSRF, vlastnictví dat, autorizace, zámek účtu, schválení a zamítnutí
 s auditem, optimistická souběžnost, e-maily přes outbox včetně opakování po výpadku SMTP, hromadné akce, zprávy
 a jejich čtení, PDF, audit log a CSV (včetně ochrany proti vzorcům v Excelu), 2FA (TOTP, replay, záložní kódy,
 reset), mapa a geokódování, SignalR hub (autorizace a doručení události), demo data, statistiky; na frontendu
-průvodce registrací, přihlášení kódem, přehled, hromadné akce, 2FA přihlášení, zprávy v portálu a animace úvodní stránky.
+čtyřkrokový průvodce registrací (včetně ověření kódem a chybových stavů), přihlášení kódem, přehled, hromadné akce, 2FA přihlášení, zprávy v portálu a animace úvodní stránky.
 
 ---
 
@@ -594,9 +654,11 @@ Nebezpečné metody vyžadují hlavičku `X-CSRF-TOKEN` (token z `GET /api/secur
 
 | Metoda | Cesta | Přístup | Popis |
 |---|---|---|---|
-| GET | `/api/plans` | veřejné | definice plánů |
+| GET | `/api/plans` | veřejné | definice úrovní registrace |
 | GET | `/api/security/csrf` | veřejné | antiforgery token |
-| POST | `/api/registrations` | veřejné, rate limit | registrace kliniky + odeslání ověřovacího kódu |
+| POST | `/api/registrations/email-code` | veřejné, rate limit | `{ email }` → ověřovací kód (`202`; `409` registrovaný e-mail, `429` cooldown) |
+| POST | `/api/registrations/email-code/verify` | veřejné, rate limit | `{ email, code }` → `{ verificationToken, expiresAt }` |
+| POST | `/api/registrations` | veřejné, rate limit | registrace s `emailVerificationToken` → `201` profil + přihlášení (`400 email_not_verified` bez tokenu) |
 | POST | `/api/clinic-auth/request-code`, `/verify-code`, `/logout` | veřejné, rate limit | přihlášení kliniky kódem |
 | GET / PUT | `/api/clinic/me` | klinika | vlastní údaje / úprava povolených polí |
 | GET | `/api/clinic/me/confirmation.pdf` | klinika | potvrzení o registraci |
@@ -605,7 +667,7 @@ Nebezpečné metody vyžadují hlavičku `X-CSRF-TOKEN` (token z `GET /api/secur
 | POST | `/api/admin-auth/login/two-factor` | veřejné, rate limit | `{ code }` nebo `{ recoveryCode }` → relace |
 | POST / GET | `/api/admin-auth/logout`, `/api/admin-auth/me` | admin | odhlášení, přihlášený administrátor |
 | GET / POST | `/api/admin/security/two-factor` (+ `/setup`, `/enable`, `/disable`, `/recovery-codes`) | admin | správa 2FA |
-| GET | `/api/admin/dashboard?days=7\|30` | admin | metriky, průchod registrací, plány, graf, aktivita |
+| GET | `/api/admin/dashboard?days=7\|30` | admin | metriky, průchod registrací, úrovně, graf, aktivita |
 | GET | `/api/admin/clinics` | admin | `search`, `status`, `plan`, `unread`, `sort`, `direction`, `page`, `pageSize` |
 | GET | `/api/admin/clinics/map` | admin | kliniky se souřadnicemi (`status`, `plan`) + počet bez polohy |
 | GET | `/api/admin/clinics/{id}` | admin | detail, historie, poznámky, poloha, verze |
@@ -630,11 +692,15 @@ posledních 90 dní); *Míra schválení* = schválené / (schválené + zamítn
 
 ## Bezpečnost
 
-- **Jednorázové kódy**: 6 číslic z kryptografického generátoru, v databázi jen HMAC-SHA256, platnost 10 min,
-  max. 5 pokusů, atomická spotřeba, nový kód ruší starší, cooldown 60 s, max. 5 kódů/h, rate limit na IP.
-  Neznámý e-mail dostane stejnou odpověď jako registrovaný.
+- **Jednorázové kódy** (přihlášení i ověření při registraci): 6 číslic z kryptografického generátoru, v databázi
+  jen HMAC-SHA256, platnost 10 min, max. 5 pokusů, atomická spotřeba, nový kód ruší starší, cooldown 60 s,
+  max. 5 kódů/h, rate limit na IP. Při přihlášení dostane neznámý e-mail stejnou odpověď jako registrovaný.
+- **Registrační token**: vzniká až po správném kódu, je vázaný na adresu, platí 2 h, v databázi jen jako HMAC
+  a spotřebuje se ve stejné transakci, která registraci vytvoří. E-mail s kódem neobsahuje žádný text od volajícího
+  (endpoint je veřejný a adresa ještě není ověřená).
 - **Administrátoři**: PBKDF2 (`PasswordHasher`), zámek účtu, rate limit; **2FA TOTP** – tajemství šifrované
-  Data Protection, tolerance ±30 s, každý kód jen jednou, relace vzniká až po obou faktorech, záložní kódy jako SHA-256.
+  Data Protection, tolerance ±30 s, každý kód jen jednou, relace vzniká až po obou faktorech, záložní kódy jako SHA-256
+  (spotřeba jedním podmíněným UPDATE, nelze je použít dvakrát ani souběžně).
 - **Relace**: HttpOnly, `SameSite=Strict`, `Secure` (dle `COOKIE_SECURE`), serverová validace a odvolání, 8 h.
 - **CSRF**: antiforgery token v hlavičce + `SameSite=Strict`; CORS jen pro výslovně nastavené originy.
 - **Autorizace**: oddělené politiky pro kliniku a administrátora; klinika nemá v API žádné ID, a nemůže tak číst
@@ -643,31 +709,39 @@ posledních 90 dní); *Míra schválení* = schválené / (schválené + zamítn
 - **Audit log** všech změn a přihlášení, včetně neúspěšných (zadané jméno se neukládá – lidé do něj občas píšou heslo).
 - **CSV export** neutralizuje vzorce (`=`, `+`, `-`, `@` → apostrof), aby název kliniky nespustil vzorec v Excelu.
 - **E-maily**: uživatelské texty HTML-escapované, text zprávy se do e-mailu nevkládá, demo kliniky nedostávají nic.
-- **Mapa**: popupy se skládají přes DOM (`textContent`), ne z HTML řetězců.
+- **Mapa**: popupy i tooltipy se skládají přes DOM (`textContent`), ne z HTML řetězců – název kliniky pochází
+  z veřejné registrace.
+- **Rate limiting podle skutečné IP**: Nginx věří `X-Forwarded-For` jen z privátních (dockerových) adres, tedy
+  od Caddy, který hlavičku přepisuje adresou klienta. Bez toho by za Caddy všichni návštěvníci sdíleli jeden limit.
+- **Stránkování** má horní mez stránky, takže extrémní hodnota nezpůsobí chybu serveru.
 - Explicitní DTO, validace na serveru, parametrizované dotazy (escapovaný LIKE), optimistická souběžnost (`xmin`),
   produkční chyby bez detailů výjimek.
 - **Nginx**: CSP (dlaždice jen z `tile.openstreetmap.org`), `X-Frame-Options`, `nosniff`, `Referrer-Policy`,
   `Permissions-Policy`; databáze bez publikovaného portu; API kontejner běží pod neprivilegovaným uživatelem.
 
 Pro ostrý provoz zbývá: tajemství mimo `.env`, šifrování klíčů Data
-Protection, pravidelné zálohy databáze, dedikovaný e-mailový provider (SPF/DKIM) místo Gmailu a monitoring.
+Protection, pravidelné zálohy databáze, dedikovaný e-mailový provider (SPF/DKIM) místo Gmailu, monitoring
+a periodický úklid prošlých relací a kódů (tabulky `UserSessions`, `ClinicLoginChallenges`,
+`RegistrationEmailVerifications` zatím jen rostou – při současném objemu bez dopadu).
 Při více instancích API navíc distribuovaný rate limiting, Redis backplane pro SignalR a claimování řádků outboxu.
 
 ---
 
 ## Předpoklady a omezení
 
-- **Plány** a jejich texty jsou provizorní (`Plans/PlanCatalog.cs`), bez cen.
+- **Úrovně registrace** a jejich texty i ceny jsou provizorní (`Plans/PlanCatalog.cs`).
 - **Stavy**: Pending / Approved / Rejected; zamítnutí vyžaduje důvod viditelný klinice.
-- **Ověření e-mailu ≠ schválení** – schválení je vždy ruční; schválit lze i kliniku bez ověřeného e-mailu
-  (administrace na to upozorní).
-- Klinika mění kontakty, adresu a plánová pole; **název, IČO, e-mail a plán** mění jen administrace (zatím bez UI).
-  Po změně adresy se poloha dohledá znovu.
+- **Ověření e-mailu ≠ schválení** – nové registrace mají e-mail ověřený vždy, schválení je ale vždy ruční.
+  Kliniky registrované před zavedením ověření předem mohou mít e-mail neověřený (administrace na to upozorní).
+- Klinika mění kontakty, adresu, veřejné kontakty a pole podle úrovně; **název, IČO, e-mail a úroveň** mění jen
+  administrace (zatím bez UI). Po změně adresy se poloha dohledá znovu. Starší kliniky bez veřejných kontaktů
+  musí při první úpravě údajů doplnit alespoň jeden telefon nebo e-mail.
 - **Mapa**: veřejný Nominatim povoluje max. 1 dotaz/s, nové kliniky se proto na mapě objeví s malým zpožděním;
   nenalezené adresy se zkusí znovu po 24 h. Odesílá se jen ulice, PSČ a město; vypnutí `GEOCODING_ENABLED=false`.
 - **QuestPDF** je použit pod Community licencí (zdarma pro jednotlivce a firmy s obratem do 1 mil. USD).
 - Realtime notifikace a e-mailový outbox počítají s jednou instancí API.
-- Registrace s již použitým e-mailem vrací 409 (registrace existenci účtu prozrazuje ze své podstaty; přihlášení ne).
+- Žádost o ověřovací kód i registrace s již použitým e-mailem vrací 409 (registrace existenci účtu prozrazuje ze
+  své podstaty; přihlášení ne).
 
 ---
 
@@ -686,6 +760,8 @@ Při více instancích API navíc distribuovaný rate limiting, Redis backplane 
 | Klinika není na mapě | poloha se dohledává na pozadí (~1 s/klinika); adresu nemusí Nominatim najít |
 | Ztracený telefon s Authenticatorem | záložní kód, nebo reset 2FA (viz výše) |
 | „Platnost formuláře vypršela“ | obnovte stránku (nový CSRF token) |
+| Registrace hlásí „E-mail není ověřen nebo jeho ověření vypršelo“ | od ověření kódem uplynuly více než 2 h (nebo se token už použil) – průvodce se vrátí na 1. krok, stačí e-mail ověřit znovu |
+| Hodně odpovědí 429 pro různé uživatele za Caddy | Nginx musí mít `set_real_ip_from` pro síť Dockeru (je v `frontend/nginx/default.conf`); po úpravě znovu sestavit `web` |
 | Testy backendu selžou na Dockeru | Testcontainers potřebuje běžící Docker |
 | Docker Desktop „unable to start“ / zaseknutý build | dojde-li místo na disku, uvolněte ho, `docker builder prune -f` a restart PC. Poškozený obraz po zaseknutém buildu: `docker compose build --no-cache api` |
 | `deploy.ps1` hlásí „Docker is not running“ nebo málo místa | spusťte Docker Desktop, nebo nasaďte s `-BuildOnServer` |
