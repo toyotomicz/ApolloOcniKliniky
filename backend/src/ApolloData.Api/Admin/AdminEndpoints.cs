@@ -71,6 +71,9 @@ public sealed record ClinicMapDto(IReadOnlyList<MapClinicDto> Items, int Without
 public static class AdminEndpoints
 {
     public const int MaxPageSize = 100;
+
+    /// <summary>Upper bound for the page number, so (page - 1) * pageSize can never overflow into a negative offset.</summary>
+    public const int MaxPage = 100_000;
     public const int MaxBulkSize = 100;
 
     public static void MapAdminEndpoints(this IEndpointRouteBuilder app)
@@ -136,7 +139,7 @@ public static class AdminEndpoints
         var (clinics, errors) = Filter(db, query.Search, query.Status, query.Plan, query.Unread);
         if (clinics is null) return ApiProblems.Validation(errors);
 
-        var page = Math.Max(1, query.Page ?? 1);
+        var page = Math.Clamp(query.Page ?? 1, 1, MaxPage);
         var pageSize = Math.Clamp(query.PageSize ?? 20, 1, MaxPageSize);
 
         var descending = !string.Equals(query.Direction, "asc", StringComparison.OrdinalIgnoreCase);

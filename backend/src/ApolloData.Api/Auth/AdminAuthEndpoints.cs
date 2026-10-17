@@ -122,12 +122,13 @@ public static class AdminAuthEndpoints
         var valid = false;
         if (useRecovery)
         {
+            // Consumed with one conditional UPDATE, so two parallel requests cannot both use the same code.
             var hash = TwoFactorService.HashRecoveryCode(request.RecoveryCode!);
-            var recovery = await db.AdminRecoveryCodes
-                .FirstOrDefaultAsync(c => c.AdministratorId == admin.Id && c.UsedAt == null && c.CodeHash == hash, ct);
-            if (recovery is not null)
+            var consumed = await db.AdminRecoveryCodes
+                .Where(c => c.AdministratorId == admin.Id && c.UsedAt == null && c.CodeHash == hash)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.UsedAt, now), ct);
+            if (consumed > 0)
             {
-                recovery.UsedAt = now;
                 valid = true;
                 method = "recovery-code";
             }

@@ -93,9 +93,9 @@ public static class ConfirmationPdf
                 header.Item().Height(3).Background(Accent);
             });
 
-            page.Content().PaddingHorizontal(40).PaddingTop(28).PaddingBottom(16).Column(col =>
+            page.Content().PaddingHorizontal(40).PaddingTop(22).PaddingBottom(12).Column(col =>
             {
-                col.Spacing(14);
+                col.Spacing(10);
                 col.Item().Text("Potvrzení o registraci kliniky").FontSize(20).Bold();
                 col.Item().Row(row =>
                 {
@@ -165,8 +165,8 @@ public static class ConfirmationPdf
             });
             foreach (var (label, value) in rows)
             {
-                table.Cell().BorderBottom(0.5f).BorderColor(Border).PaddingVertical(6).Text(label).FontColor(Muted);
-                table.Cell().BorderBottom(0.5f).BorderColor(Border).PaddingVertical(6).Text(value);
+                table.Cell().BorderBottom(0.5f).BorderColor(Border).PaddingVertical(4).Text(label).FontColor(Muted);
+                table.Cell().BorderBottom(0.5f).BorderColor(Border).PaddingVertical(4).Text(value);
             }
         });
 

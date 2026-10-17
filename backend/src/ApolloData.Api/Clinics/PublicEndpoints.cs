@@ -17,7 +17,7 @@ public sealed record PlanDto(
     string Code, string Name, string Tagline, string Description,
     IReadOnlyList<PlanFeature> Features, IReadOnlyList<string> FieldGroups, bool Highlighted, string? Badge);
 
-public sealed record RegistrationCodeRequest(string? Email, string? ContactName);
+public sealed record RegistrationCodeRequest(string? Email);
 
 public sealed record RegistrationCodeResponse(string Email, int CodeLifetimeMinutes, int ResendAfterSeconds);
 
@@ -67,8 +67,7 @@ public static class PublicEndpoints
         var normalized = Rules.NormalizeEmail(email);
         if (await db.Clinics.AnyAsync(c => c.NormalizedEmail == normalized, ct)) return DuplicateEmail();
 
-        var contactName = request.ContactName?.Trim() is { Length: > 0 and <= 200 } name ? name : null;
-        return await verifier.IssueAsync(email, contactName, ct) switch
+        return await verifier.IssueAsync(email, ct) switch
         {
             CodeIssueResult.Sent => TypedResults.Accepted((string?)null,
                 new RegistrationCodeResponse(email, options.Value.OtpLifetimeMinutes, options.Value.OtpResendCooldownSeconds)),

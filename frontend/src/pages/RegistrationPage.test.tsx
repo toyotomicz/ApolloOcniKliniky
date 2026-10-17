@@ -47,7 +47,7 @@ describe('Registration wizard', () => {
     // Step 2: verify the e-mail with the code, then choose the level.
     expect(await screen.findByRole('heading', { name: 'Ověření e-mailu a úroveň' })).toBeInTheDocument()
     const [sendCall] = callsTo(fetchMock, 'POST', '/api/registrations/email-code')
-    expect(JSON.parse(String(sendCall![1]!.body))).toEqual({ email: 'jana@example.test', contactName: 'Jana Nováková' })
+    expect(JSON.parse(String(sendCall![1]!.body))).toEqual({ email: 'jana@example.test' })
 
     await user.click(screen.getByRole('button', { name: /Pokračovat/ }))
     expect(await screen.findByText('Nejprve ověřte e-mail kódem, který jsme vám poslali.')).toBeInTheDocument()

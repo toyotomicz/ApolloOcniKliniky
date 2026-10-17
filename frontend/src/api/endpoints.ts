@@ -36,8 +36,7 @@ function query(params: object): string {
 
 export const publicApi = {
   plans: () => http.get<Plan[]>('/api/plans'),
-  sendRegistrationCode: (email: string, contactName: string) =>
-    http.post<RegistrationCodeResponse>('/api/registrations/email-code', { email, contactName }),
+  sendRegistrationCode: (email: string) => http.post<RegistrationCodeResponse>('/api/registrations/email-code', { email }),
   verifyRegistrationCode: (email: string, code: string) =>
     http.post<RegistrationCodeVerifyResponse>('/api/registrations/email-code/verify', { email, code }),
   register: (payload: RegistrationPayload) => http.post<ClinicProfile>('/api/registrations', payload),
