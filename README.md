@@ -283,7 +283,8 @@ sequenceDiagram
     SPA->>API: POST /api/registrations/email-code/verify
     API->>DB: atomická kontrola (max. 5 pokusů) → HMAC(token), platnost 2 h
     API-->>SPA: jednorázový token
-    K->>SPA: krok 3 – veřejné kontakty, údaje podle úrovně; krok 4 – souhrn
+    K->>SPA: krok 3 – veřejné kontakty, údaje podle úrovně
+    K->>SPA: krok 4 – souhrn a odeslání
     SPA->>API: POST /api/registrations (+ token)
     API->>DB: jedna transakce: klinika (e-mail ověřen) + spotřeba tokenu + audit + řádek v OutboundEmails
     API-->>SPA: 201 + HttpOnly cookie s ID relace (klinika je přihlášená)
