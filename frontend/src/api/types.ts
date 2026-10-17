@@ -54,6 +54,13 @@ export interface ClinicProfile {
   createdAt: string
   updatedAt: string
   emailVerifiedAt: string | null
+  /** Booking contacts published for patients. */
+  publicEmails: string[]
+  publicPhones: string[]
+  website: string | null
+  patientInfo: string | null
+  /** When the registering person confirmed the authority to act for the organization (null for older registrations). */
+  authorityConfirmedAt: string | null
 }
 
 export interface RegistrationPayload {
@@ -74,18 +81,31 @@ export interface RegistrationPayload {
     technicalContactEmail: string | null
     notes: string | null
   } | null
+  publicEmails: string[]
+  publicPhones: string[]
+  website: string | null
+  patientInfo: string | null
+  authorityConfirmed: boolean
   privacyNoticeAccepted: boolean
+  /** Issued after the e-mail was verified with the registration code. */
+  emailVerificationToken: string | null
 }
 
 export type ProfileUpdatePayload = Omit<
   RegistrationPayload,
-  'planCode' | 'name' | 'organizationId' | 'email' | 'privacyNoticeAccepted'
+  'planCode' | 'name' | 'organizationId' | 'email' | 'privacyNoticeAccepted' | 'authorityConfirmed' | 'emailVerificationToken'
 >
 
-export interface RegistrationResponse {
+export interface RegistrationCodeResponse {
   email: string
-  verificationEmailSent: boolean
   codeLifetimeMinutes: number
+  resendAfterSeconds: number
+}
+
+export interface RegistrationCodeVerifyResponse {
+  email: string
+  verificationToken: string
+  expiresAt: string
 }
 
 export interface RequestCodeResponse {

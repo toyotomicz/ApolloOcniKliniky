@@ -1,5 +1,6 @@
 using System.Net;
 using ApolloData.Api.Domain;
+using ApolloData.Api.Plans;
 
 namespace ApolloData.Api.Email;
 
@@ -36,6 +37,66 @@ public static class EmailTemplates
             """;
 
         return new EmailMessage(toEmail, recipientName, subject, text, Layout(appName, "Přihlašovací kód", body));
+    }
+
+    /// <summary>Verifies the e-mail address at the start of a registration (before the clinic exists).</summary>
+    public static EmailMessage RegistrationCode(string appName, string toEmail, string? recipientName, string code, int validMinutes)
+    {
+        var subject = $"{appName}: ověřovací kód pro registraci";
+        var text =
+            $"""
+            Dobrý den,
+
+            pro pokračování v registraci kliniky v portálu {appName} zadejte tento ověřovací kód:
+
+                {code}
+
+            Kód je platný {validMinutes} minut a lze jej použít pouze jednou.
+            Pokud jste registraci nezačali, tento e-mail ignorujte.
+
+            {appName}
+            """;
+
+        var body =
+            $"""
+            <p style="margin:0 0 16px;">{Greeting(recipientName)}</p>
+            <p style="margin:0 0 16px;">pro pokračování v registraci kliniky zadejte tento ověřovací kód:</p>
+            <p style="margin:0 0 20px;font-size:32px;font-weight:700;letter-spacing:.3em;font-family:Consolas,monospace;">{code}</p>
+            <p style="margin:0 0 8px;color:#5c6670;font-size:14px;">Kód je platný {validMinutes} minut a lze jej použít pouze jednou.</p>
+            <p style="margin:0;color:#5c6670;font-size:14px;">Pokud jste registraci nezačali, tento e-mail ignorujte.</p>
+            """;
+
+        return new EmailMessage(toEmail, recipientName, subject, text, Layout(appName, "Ověření e-mailu", body));
+    }
+
+    /// <summary>Confirms a submitted registration; the outbox worker attaches the PDF overview of the entered data.</summary>
+    public static EmailMessage RegistrationConfirmation(string appName, Clinic clinic, string portalUrl)
+    {
+        var contact = $"{clinic.ContactFirstName} {clinic.ContactLastName}";
+        var level = PlanCatalog.Find(clinic.PlanCode)?.Name ?? clinic.PlanCode;
+        var subject = $"{appName}: registrace kliniky byla přijata";
+        var text =
+            $"""
+            Dobrý den, {contact},
+
+            registraci kliniky {clinic.Name} ({level}) jsme přijali ke zpracování.
+            V příloze najdete PDF přehled vyplněných údajů.
+
+            O výsledku posouzení vás budeme informovat e-mailem. Údaje můžete mezitím upravit v portálu kliniky
+            (přihlášení kódem z e-mailu):
+            {portalUrl}
+
+            {appName}
+            """;
+        var body =
+            $"""
+            <p style="margin:0 0 16px;">{Greeting(contact)}</p>
+            <p style="margin:0 0 16px;">registraci kliniky <strong>{Encode(clinic.Name)}</strong> ({Encode(level)}) jsme přijali ke zpracování.
+            V příloze najdete <strong>PDF přehled vyplněných údajů</strong>.</p>
+            <p style="margin:0 0 20px;">O výsledku posouzení vás budeme informovat e-mailem. Údaje můžete mezitím upravit v portálu kliniky.</p>
+            {Button(portalUrl, "Otevřít portál kliniky")}
+            """;
+        return new EmailMessage(clinic.Email, contact, subject, text, Layout(appName, "Registrace přijata", body));
     }
 
     /// <summary>Sent when an administrator approves, rejects or returns a registration for review.</summary>

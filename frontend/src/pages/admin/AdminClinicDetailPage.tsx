@@ -100,6 +100,7 @@ function ClinicDetailView({
               <DefinitionList
                 items={[
                   ['E-mail ověřen', clinic.emailVerifiedAt ? formatDateTime(clinic.emailVerifiedAt) : <span className="muted">Neověřen</span>],
+                  ['Oprávnění jednat', clinic.authorityConfirmedAt ? `Potvrzeno ${formatDateTime(clinic.authorityConfirmedAt)}` : 'Nepotvrzeno'],
                   ['Poslední přihlášení', formatDateTime(detail.lastSignInAt)],
                   ['Změna stavu', formatDateTime(clinic.statusChangedAt)],
                   ['Zásady zpracování', `${formatDateTime(detail.privacyNoticeAcceptedAt)} (verze ${detail.privacyNoticeVersion})`],

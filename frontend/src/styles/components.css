@@ -785,3 +785,44 @@ legend {
     margin-bottom: 0;
   }
 }
+
+/* Booking contacts: repeatable rows with a remove button next to the input. */
+.contact-rows {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.contact-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+}
+.contact-row .field {
+  flex: 1;
+  min-width: 0;
+}
+.contact-row-remove {
+  margin-top: 30px;
+  flex-shrink: 0;
+}
+
+/* Registration: confirmed e-mail and the success screen. */
+.verify-done {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.verify-done .section-title {
+  color: var(--color-success);
+}
+.prereq-icon.prereq-icon-success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}

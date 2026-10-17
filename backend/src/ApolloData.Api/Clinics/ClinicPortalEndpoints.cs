@@ -76,6 +76,10 @@ public static class ClinicPortalEndpoints
         clinic.PostalCode = valid.PostalCode;
         clinic.OperationalContact = valid.OperationalContact;
         clinic.ServiceConfiguration = valid.ServiceConfiguration;
+        clinic.PublicEmails = valid.PublicContacts.Emails;
+        clinic.PublicPhones = valid.PublicContacts.Phones;
+        clinic.Website = valid.PublicContacts.Website;
+        clinic.PatientInfo = valid.PublicContacts.PatientInfo;
 
         if (addressChanged) clinic.ResetLocation();
 

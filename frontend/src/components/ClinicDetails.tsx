@@ -5,6 +5,15 @@ import { DefinitionList } from './ui'
 
 /** Read-only clinic data cards, shared by the clinic portal and the administrator detail page. */
 export function ClinicDetails({ clinic }: { clinic: ClinicProfile }) {
+  const website = clinic.website ? (
+    <a href={clinic.website} target="_blank" rel="noopener noreferrer">
+      {clinic.website.replace(/^https?:\/\//, '')}
+    </a>
+  ) : (
+    '—'
+  )
+  const patientInfo = clinic.patientInfo ? <span style={{ whiteSpace: 'pre-wrap' }}>{clinic.patientInfo}</span> : '—'
+
   return (
     <div className="stack">
       <section className="card" aria-labelledby="clinic-section">
@@ -33,6 +42,22 @@ export function ClinicDetails({ clinic }: { clinic: ClinicProfile }) {
               ['Jméno', `${clinic.contactFirstName} ${clinic.contactLastName}`],
               ['E-mail (přihlášení)', clinic.email],
               ['Telefon', formatPhone(clinic.phone)],
+            ]}
+          />
+        </div>
+      </section>
+
+      <section className="card" aria-labelledby="public-section">
+        <div className="card-header">
+          <h2 id="public-section">Kontakty pro pacienty</h2>
+        </div>
+        <div className="card-body">
+          <DefinitionList
+            items={[
+              ['Telefon', clinic.publicPhones.length > 0 ? clinic.publicPhones.map(formatPhone).join(', ') : '—'],
+              ['E-mail', clinic.publicEmails.length > 0 ? clinic.publicEmails.join(', ') : '—'],
+              ['Web', website],
+              ['Další informace', patientInfo],
             ]}
           />
         </div>

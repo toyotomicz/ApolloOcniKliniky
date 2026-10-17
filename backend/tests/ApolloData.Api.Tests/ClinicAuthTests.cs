@@ -12,7 +12,7 @@ public sealed class ClinicAuthTests(ApiFactory factory)
     public async Task Valid_code_signs_in_and_verifies_email_without_approving()
     {
         using var client = factory.CreateTestClient();
-        var email = await Scenario.RegisterAsync(factory, client);
+        var email = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
         var code = factory.Email.LastCodeFor(email);
 
         var verify = await client.PostAsync("/api/clinic-auth/verify-code", new { email, code });
@@ -28,7 +28,7 @@ public sealed class ClinicAuthTests(ApiFactory factory)
     public async Task Code_is_stored_only_as_hash()
     {
         using var client = factory.CreateTestClient();
-        var email = await Scenario.RegisterAsync(factory, client);
+        var email = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
         var code = factory.Email.LastCodeFor(email)!;
 
         var challenge = await factory.WithDbAsync(db => db.ClinicLoginChallenges.SingleAsync(c => c.Clinic!.NormalizedEmail == email));
@@ -40,7 +40,7 @@ public sealed class ClinicAuthTests(ApiFactory factory)
     public async Task Code_cannot_be_reused()
     {
         using var client = factory.CreateTestClient();
-        var email = await Scenario.RegisterAsync(factory, client);
+        var email = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
         var code = factory.Email.LastCodeFor(email);
 
         await (await client.PostAsync("/api/clinic-auth/verify-code", new { email, code })).EnsureStatusAsync(HttpStatusCode.OK);
@@ -54,7 +54,7 @@ public sealed class ClinicAuthTests(ApiFactory factory)
     public async Task Expired_code_is_rejected()
     {
         using var client = factory.CreateTestClient();
-        var email = await Scenario.RegisterAsync(factory, client);
+        var email = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
         var code = factory.Email.LastCodeFor(email);
 
         factory.Time.Advance(TimeSpan.FromMinutes(11));
@@ -67,13 +67,13 @@ public sealed class ClinicAuthTests(ApiFactory factory)
     public async Task New_code_supersedes_previous_code()
     {
         using var client = factory.CreateTestClient();
-        var email = await Scenario.RegisterAsync(factory, client);
+        var email = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
         var firstCode = factory.Email.LastCodeFor(email);
 
         factory.Time.Advance(TimeSpan.FromSeconds(61));
         await (await client.PostAsync("/api/clinic-auth/request-code", new { email })).EnsureStatusAsync(HttpStatusCode.Accepted);
         var secondCode = factory.Email.LastCodeFor(email);
-        Assert.Equal(2, factory.Email.CountFor(email));
+        Assert.Equal(2, factory.Email.LoginCodeCountFor(email));
 
         if (firstCode != secondCode)
         {
@@ -88,19 +88,19 @@ public sealed class ClinicAuthTests(ApiFactory factory)
     public async Task Resend_within_cooldown_does_not_send_another_email_but_responds_identically()
     {
         using var client = factory.CreateTestClient();
-        var email = await Scenario.RegisterAsync(factory, client);
+        var email = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
 
         var response = await client.PostAsync("/api/clinic-auth/request-code", new { email });
 
         await response.EnsureStatusAsync(HttpStatusCode.Accepted);
-        Assert.Equal(1, factory.Email.CountFor(email));
+        Assert.Equal(1, factory.Email.LoginCodeCountFor(email));
     }
 
     [Fact]
     public async Task Code_is_locked_after_max_wrong_attempts()
     {
         using var client = factory.CreateTestClient();
-        var email = await Scenario.RegisterAsync(factory, client);
+        var email = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
         var code = factory.Email.LastCodeFor(email)!;
         var wrong = code == "000000" ? "111111" : "000000";
 
@@ -117,17 +117,16 @@ public sealed class ClinicAuthTests(ApiFactory factory)
     public async Task Unknown_email_gets_same_public_response_and_no_email()
     {
         using var client = factory.CreateTestClient();
-        var known = await Scenario.RegisterAsync(factory, client);
+        var known = await Scenario.RegisterAndRequestLoginCodeAsync(factory, client);
         factory.Time.Advance(TimeSpan.FromSeconds(61));
         var unknown = Scenario.UniqueEmail("neexistuje");
-        var before = factory.Email.Sent.Count;
 
         var knownResponse = await client.PostAsync("/api/clinic-auth/request-code", new { email = known });
         var unknownResponse = await client.PostAsync("/api/clinic-auth/request-code", new { email = unknown });
 
         Assert.Equal(knownResponse.StatusCode, unknownResponse.StatusCode);
         Assert.Equal(await knownResponse.Content.ReadAsStringAsync(), await unknownResponse.Content.ReadAsStringAsync());
-        Assert.Equal(before + 1, factory.Email.Sent.Count);
+        Assert.Equal(2, factory.Email.LoginCodeCountFor(known));
         Assert.Equal(0, factory.Email.CountFor(unknown));
     }
 

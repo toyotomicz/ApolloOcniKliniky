@@ -41,6 +41,20 @@ public sealed class Clinic
     /// <summary>Code of a plan from <see cref="Plans.PlanCatalog"/>.</summary>
     public required string PlanCode { get; set; }
 
+    /// <summary>Booking contacts published for patients (normalized; phones without spaces).</summary>
+    public List<string> PublicEmails { get; set; } = [];
+    public List<string> PublicPhones { get; set; } = [];
+    public string? Website { get; set; }
+
+    /// <summary>Further information for patients, e.g. opening hours or how to book.</summary>
+    public string? PatientInfo { get; set; }
+
+    /// <summary>
+    /// When the registering person confirmed they are authorized to act on behalf of the organization.
+    /// Null for registrations created before the confirmation existed.
+    /// </summary>
+    public DateTime? AuthorityConfirmedAt { get; set; }
+
     /// <summary>Required by the Standard and Premium plans.</summary>
     public OperationalContact? OperationalContact { get; set; }
 

@@ -21,6 +21,11 @@ public static class Scenario
             ["street"] = "Náměstí Republiky 1",
             ["city"] = "Plzeň",
             ["postalCode"] = "30100",
+            ["publicPhones"] = new[] { "377 123 456" },
+            ["publicEmails"] = new[] { "objednavky@example.test" },
+            ["website"] = "www.ordinace-testovaci.cz",
+            ["patientInfo"] = "Objednávky po–pá 7–15 h.",
+            ["authorityConfirmed"] = true,
             ["privacyNoticeAccepted"] = true,
         };
         if (plan is "standard" or "premium")
@@ -34,23 +39,49 @@ public static class Scenario
         return body;
     }
 
+    /// <summary>Verifies the address with the emailed registration code and returns the registration token.</summary>
+    public static async Task<string> VerifyEmailAsync(ApiFactory factory, TestClient client, string email)
+    {
+        await (await client.PostAsync("/api/registrations/email-code", new { email })).EnsureStatusAsync(HttpStatusCode.Accepted);
+        var code = factory.Email.LastRegistrationCodeFor(email)!;
+        var response = await client.PostAsync("/api/registrations/email-code/verify", new { email, code });
+        await response.EnsureStatusAsync(HttpStatusCode.OK);
+        return (await response.ReadJsonAsync()).GetProperty("verificationToken").GetString()!;
+    }
+
+    /// <summary>Verifies the e-mail of <paramref name="body"/> and submits the registration with the token.</summary>
+    public static async Task<HttpResponseMessage> SubmitRegistrationAsync(ApiFactory factory, TestClient client, Dictionary<string, object?> body)
+    {
+        body["emailVerificationToken"] = await VerifyEmailAsync(factory, client, (string)body["email"]!);
+        return await client.PostAsync("/api/registrations", body);
+    }
+
+    /// <summary>Registers a clinic; the client is signed in as that clinic afterwards.</summary>
     public static async Task<string> RegisterAsync(ApiFactory factory, TestClient client, string plan = "basic", string? email = null)
     {
         email ??= UniqueEmail();
-        var response = await client.PostAsync("/api/registrations", Registration(email, plan));
+        var response = await SubmitRegistrationAsync(factory, client, Registration(email, plan));
         await response.EnsureStatusAsync(HttpStatusCode.Created);
         return email;
     }
 
-    /// <summary>Registers a clinic and signs the client in with the emailed one-time code.</summary>
+    /// <summary>Registers a clinic; registration signs the client in, so it can use the clinic portal right away.</summary>
     public static async Task<(string Email, Guid ClinicId)> RegisterAndSignInAsync(ApiFactory factory, TestClient client, string plan = "basic")
     {
-        var email = await RegisterAsync(factory, client, plan);
-        var code = factory.Email.LastCodeFor(email)!;
-        var response = await client.PostAsync("/api/clinic-auth/verify-code", new { email, code });
-        await response.EnsureStatusAsync(HttpStatusCode.OK);
+        var email = UniqueEmail();
+        var response = await SubmitRegistrationAsync(factory, client, Registration(email, plan));
+        await response.EnsureStatusAsync(HttpStatusCode.Created);
         var json = await response.ReadJsonAsync();
         return (email, json.GetProperty("id").GetGuid());
+    }
+
+    /// <summary>Registers a clinic from a separate client and requests a login code for it on <paramref name="client"/>.</summary>
+    public static async Task<string> RegisterAndRequestLoginCodeAsync(ApiFactory factory, TestClient client)
+    {
+        using var registrant = factory.CreateTestClient();
+        var email = await RegisterAsync(factory, registrant);
+        await (await client.PostAsync("/api/clinic-auth/request-code", new { email })).EnsureStatusAsync(HttpStatusCode.Accepted);
+        return email;
     }
 
     public static async Task SignInAdminAsync(TestClient client)

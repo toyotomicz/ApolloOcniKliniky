@@ -21,13 +21,13 @@ public sealed class AuditMapRealtimeTests(ApiFactory factory)
         using var clinicClient = factory.CreateTestClient();
         var email = Scenario.UniqueEmail();
         var body = Scenario.Registration(email, name: "=HYPERLINK(\"http://evil.test\")");
-        await (await clinicClient.PostAsync("/api/registrations", body)).EnsureStatusAsync(HttpStatusCode.Created);
+        await (await Scenario.SubmitRegistrationAsync(factory, clinicClient, body)).EnsureStatusAsync(HttpStatusCode.Created);
         var clinicId = await factory.WithDbAsync(db => db.Clinics.Where(c => c.NormalizedEmail == email).Select(c => c.Id).SingleAsync());
 
         using var admin = factory.CreateTestClient();
         await Scenario.SignInAdminAsync(admin);
 
-        var page = await admin.GetJsonAsync<System.Text.Json.JsonElement>($"/api/admin/audit?clinicId={clinicId}&actor=clinic");
+        var page = await admin.GetJsonAsync<System.Text.Json.JsonElement>($"/api/admin/audit?clinicId={clinicId}&actor=clinic&type=clinicRegistered");
         var item = Assert.Single(page.GetProperty("items").EnumerateArray());
         Assert.Equal("clinicRegistered", item.GetProperty("type").GetString());
         Assert.Equal("clinic", item.GetProperty("actor").GetString());
@@ -83,6 +83,7 @@ public sealed class AuditMapRealtimeTests(ApiFactory factory)
             street = "Americká 42",
             city = "Plzeň",
             postalCode = "30100",
+            publicPhones = new[] { "377 123 456" },
         };
         await (await clinicClient.PutAsync("/api/clinic/me", update)).EnsureStatusAsync(HttpStatusCode.OK);
         var reset = await factory.WithDbAsync(db => db.Clinics.SingleAsync(c => c.Id == clinicId));

@@ -22,6 +22,8 @@ internal sealed class ClinicConfiguration : IEntityTypeConfiguration<Clinic>
         b.Property(c => c.PlanCode).HasMaxLength(32);
         b.Property(c => c.StatusMessage).HasMaxLength(1000);
         b.Property(c => c.PrivacyNoticeVersion).HasMaxLength(32);
+        b.Property(c => c.Website).HasMaxLength(300);
+        b.Property(c => c.PatientInfo).HasMaxLength(1000);
 
         // PostgreSQL's xmin changes on every row update and serves as an optimistic concurrency token.
         b.Property(c => c.Version).IsRowVersion();
@@ -62,6 +64,18 @@ internal sealed class ClinicLoginChallengeConfiguration : IEntityTypeConfigurati
         b.Property(c => c.CodeHash).HasMaxLength(32);
         b.HasOne(c => c.Clinic).WithMany().HasForeignKey(c => c.ClinicId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(c => new { c.ClinicId, c.CreatedAt });
+    }
+}
+
+internal sealed class RegistrationEmailVerificationConfiguration : IEntityTypeConfiguration<RegistrationEmailVerification>
+{
+    public void Configure(EntityTypeBuilder<RegistrationEmailVerification> b)
+    {
+        b.HasKey(v => v.Id);
+        b.Property(v => v.NormalizedEmail).HasMaxLength(254);
+        b.Property(v => v.CodeHash).HasMaxLength(32);
+        b.Property(v => v.TokenHash).HasMaxLength(32);
+        b.HasIndex(v => new { v.NormalizedEmail, v.CreatedAt });
     }
 }
 

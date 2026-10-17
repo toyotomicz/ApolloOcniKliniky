@@ -37,7 +37,11 @@ public sealed class SmtpOptions
     }
 }
 
-public sealed record EmailMessage(string ToEmail, string? ToName, string Subject, string TextBody, string HtmlBody);
+public sealed record EmailAttachment(string FileName, string ContentType, byte[] Content);
+
+public sealed record EmailMessage(
+    string ToEmail, string? ToName, string Subject, string TextBody, string HtmlBody,
+    IReadOnlyList<EmailAttachment>? Attachments = null);
 
 /// <summary>Thrown when the message could not be handed over to the SMTP server.</summary>
 public sealed class EmailDeliveryException(string message, Exception? inner = null) : Exception(message, inner);
@@ -64,7 +68,12 @@ internal sealed class MailKitEmailSender(IOptions<SmtpOptions> options, ILogger<
         mime.From.Add(new MailboxAddress(smtp.FromName, smtp.FromEmail ?? smtp.Username!));
         mime.To.Add(new MailboxAddress(message.ToName ?? string.Empty, message.ToEmail));
         mime.Subject = message.Subject;
-        mime.Body = new BodyBuilder { TextBody = message.TextBody, HtmlBody = message.HtmlBody }.ToMessageBody();
+        var body = new BodyBuilder { TextBody = message.TextBody, HtmlBody = message.HtmlBody };
+        foreach (var attachment in message.Attachments ?? [])
+        {
+            body.Attachments.Add(attachment.FileName, attachment.Content, ContentType.Parse(attachment.ContentType));
+        }
+        mime.Body = body.ToMessageBody();
 
         var socketOptions = smtp.UseStartTls
             ? SecureSocketOptions.StartTls

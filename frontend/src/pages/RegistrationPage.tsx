@@ -1,27 +1,26 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, ArrowRight, MailCheck, Send } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { ArrowLeft, ArrowRight, CircleCheck, Download, MailCheck, RotateCw, Send, ShieldCheck } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { FormProvider, useForm, useFormContext, type Path, type Resolver } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
-import { publicApi } from '../api/endpoints'
-import type { Plan, RegistrationResponse } from '../api/types'
+import { clinicApi, publicApi } from '../api/endpoints'
+import type { ClinicProfile, Plan } from '../api/types'
 import { useClinicSession } from '../auth/sessions'
 import {
   AddressFields,
   ContactPersonFields,
   OperationalContactFields,
+  PublicContactFields,
   ServiceConfigurationFields,
 } from '../components/ClinicFormFields'
-import { CodeVerification } from '../components/CodeVerification'
 import { planRequirementText } from '../components/PlanCard'
-import { useToast } from '../components/Toast'
 import { Alert, DefinitionList, Field, LoadingBlock, Spinner } from '../components/ui'
 import { formatPhone, formatPostalCode, onboardingLabels } from '../lib/format'
 import { usePlans } from '../lib/usePlans'
-import { emptyContact, registrationSchema, toRegistrationPayload, type RegistrationFormValues } from '../lib/validation'
+import { emptyContact, formFieldPath, registrationSchema, toRegistrationPayload, type RegistrationFormValues } from '../lib/validation'
 
-type StepKey = 'plan' | 'clinic' | 'extra' | 'summary'
+type StepKey = 'clinic' | 'verify' | 'contacts' | 'summary'
 interface Step {
   key: StepKey
   title: string
@@ -36,23 +35,34 @@ const serviceFields: Path<RegistrationFormValues>[] = [
   'serviceConfiguration.notes',
 ]
 
-/** Steps depend on the selected plan: the "extra" step only exists for plans with additional field groups. */
+/**
+ * The four steps described on the landing page ("Jak to funguje"). Level-specific fields are part of the
+ * contacts step, so the number of steps never changes with the selected level.
+ */
 export function buildSteps(plan: Plan | undefined): Step[] {
-  const extraFields = [
-    ...(plan?.fieldGroups.includes('operationalContact') ? operationalFields : []),
-    ...(plan?.fieldGroups.includes('serviceConfiguration') ? serviceFields : []),
-  ]
   return [
-    { key: 'plan', title: 'Úroveň', fields: ['planCode'] },
     {
       key: 'clinic',
-      title: 'Klinika a kontakt',
-      fields: ['name', 'organizationId', 'email', 'contactFirstName', 'contactLastName', 'phone', 'street', 'city', 'postalCode'],
+      title: 'Kontakt a organizace',
+      fields: ['name', 'organizationId', 'email', 'contactFirstName', 'contactLastName', 'phone', 'street', 'city', 'postalCode', 'authorityConfirmed'],
     },
-    ...(extraFields.length > 0 ? [{ key: 'extra' as const, title: 'Údaje podle úrovně', fields: extraFields }] : []),
+    { key: 'verify', title: 'Ověření e-mailu a úroveň', fields: ['planCode'] },
+    {
+      key: 'contacts',
+      title: 'Veřejné kontakty',
+      fields: [
+        'publicContacts',
+        'website',
+        'patientInfo',
+        ...(plan?.fieldGroups.includes('operationalContact') ? operationalFields : []),
+        ...(plan?.fieldGroups.includes('serviceConfiguration') ? serviceFields : []),
+      ],
+    },
     { key: 'summary', title: 'Souhrn a odeslání', fields: ['privacyNoticeAccepted'] },
   ]
 }
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
 export function RegistrationPage() {
   const { plans, error, retry } = usePlans()
@@ -76,16 +86,32 @@ export function RegistrationPage() {
   )
 }
 
+/** E-mail verification state: kept outside the form so it survives moving between steps. */
+interface VerificationState {
+  /** Normalized address the last code was sent to. */
+  codeEmail: string | null
+  /** Time (ms) from which another code may be requested. */
+  resendAt: number
+  /** Registration token for `tokenEmail`, issued after the code was confirmed. */
+  token: string | null
+  tokenEmail: string | null
+}
+
 function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initialPlanCode: string | null }) {
+  const session = useClinicSession()
   const initialPlan = plans.find((p) => p.code === initialPlanCode)
-  const [stepIndex, setStepIndex] = useState(initialPlan ? 1 : 0)
-  const [result, setResult] = useState<RegistrationResponse | null>(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [stepIndex, setStepIndex] = useState(0)
+  const [registered, setRegistered] = useState<ClinicProfile | null>(null)
+  const [stepError, setStepError] = useState<string | null>(null)
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
+  const [verification, setVerification] = useState<VerificationState>({ codeEmail: null, resendAt: 0, token: null, tokenEmail: null })
+  const [sendingCode, setSendingCode] = useState(false)
+  const [codeNotice, setCodeNotice] = useState<string | null>(null)
+  const [codeError, setCodeError] = useState<string | null>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const firstRender = useRef(true)
 
-  // The schema depends on the selected plan, so it is resolved per validation run.
+  // The schema depends on the selected level, so it is resolved per validation run.
   const resolver: Resolver<RegistrationFormValues> = (values, context, options) => {
     const schema = registrationSchema(plans.find((p) => p.code === values.planCode))
     // Form values are plain strings/booleans; the schema output type (e.g. `privacyNoticeAccepted: true`) is stricter.
@@ -103,6 +129,7 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
       name: '',
       organizationId: '',
       email: '',
+      authorityConfirmed: false,
       privacyNoticeAccepted: false,
     },
   })
@@ -110,7 +137,9 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
   const planCode = form.watch('planCode')
   const plan = plans.find((p) => p.code === planCode)
   const steps = useMemo(() => buildSteps(plan), [plan])
-  const step = steps[Math.min(stepIndex, steps.length - 1)]!
+  const step = steps[stepIndex]!
+  const currentEmail = normalizeEmail(form.watch('email'))
+  const verified = verification.token !== null && verification.tokenEmail === currentEmail
 
   useEffect(() => {
     if (firstRender.current) {
@@ -118,38 +147,108 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
       return
     }
     headingRef.current?.focus()
-  }, [stepIndex, result])
+  }, [stepIndex, registered])
+
+  const goTo = (key: StepKey) => {
+    setStepError(null)
+    setStepIndex(steps.findIndex((s) => s.key === key))
+  }
+
+  /** Sends a registration code to the entered address. Returns false when the user has to fix something first. */
+  const sendCode = async (): Promise<boolean> => {
+    const { email, contactFirstName, contactLastName } = form.getValues()
+    setSendingCode(true)
+    setStepError(null)
+    setCodeError(null)
+    try {
+      const response = await publicApi.sendRegistrationCode(email.trim(), `${contactFirstName} ${contactLastName}`.trim())
+      setVerification((v) => ({ ...v, codeEmail: normalizeEmail(email), resendAt: Date.now() + response.resendAfterSeconds * 1000 }))
+      setCodeNotice(null)
+      return true
+    } catch (error) {
+      if (!(error instanceof ApiError)) {
+        setStepError('Ověřovací kód se nepodařilo odeslat.')
+        return false
+      }
+      if (error.code === 'code_throttled') {
+        // A code was sent a moment ago; the latest one is still valid.
+        setVerification((v) => ({ ...v, codeEmail: normalizeEmail(email), resendAt: Date.now() + 60_000 }))
+        setCodeNotice(error.message)
+        return true
+      }
+      if (error.code === 'email_taken') {
+        form.setError('email', { type: 'server', message: error.fieldErrors.email ?? error.message })
+        setRegisteredEmail(email.trim())
+        setStepIndex(0)
+      }
+      setStepError(error.message)
+      return false
+    } finally {
+      setSendingCode(false)
+    }
+  }
 
   const next = async () => {
+    setStepError(null)
+    setRegisteredEmail(null)
     const valid = await form.trigger(step.fields, { shouldFocus: true })
+
+    if (step.key === 'clinic') {
+      if (!valid) return
+      // A code is sent when the address is new; going back and forth does not send another one.
+      const alreadyHandled = verified || (verification.codeEmail === currentEmail && Date.now() < verification.resendAt)
+      if (!alreadyHandled && !(await sendCode())) return
+    }
+    if (step.key === 'verify' && !verified) {
+      setCodeError('Nejprve ověřte e-mail kódem, který jsme vám poslali.')
+      document.querySelector<HTMLInputElement>('[data-registration-code]')?.focus()
+      return
+    }
     if (valid) setStepIndex((i) => Math.min(i + 1, steps.length - 1))
   }
 
-  const back = () => setStepIndex((i) => Math.max(i - 1, 0))
+  const back = () => {
+    setStepError(null)
+    setStepIndex((i) => Math.max(i - 1, 0))
+  }
 
   const onSubmit = form.handleSubmit(async (values) => {
-    setSubmitError(null)
+    setStepError(null)
     setRegisteredEmail(null)
+    if (!verified) {
+      goTo('verify')
+      setCodeError('E-mail je potřeba ověřit kódem.')
+      return
+    }
     try {
-      setResult(await publicApi.register(toRegistrationPayload(values, plan)))
+      const profile = await publicApi.register(toRegistrationPayload(values, plan, verification.token))
+      session.setData(profile)
+      setRegistered(profile)
     } catch (error) {
       if (!(error instanceof ApiError)) {
-        setSubmitError('Registraci se nepodařilo odeslat.')
+        setStepError('Registraci se nepodařilo odeslat.')
         return
       }
-      setSubmitError(error.message)
-      if (error.code === 'email_taken') setRegisteredEmail(values.email.trim())
-      const fields = Object.keys(error.fieldErrors)
-      for (const field of fields) {
-        form.setError(field as Path<RegistrationFormValues>, { type: 'server', message: error.fieldErrors[field] })
+      setStepError(error.message)
+      if (error.code === 'email_not_verified') {
+        // The verification expired (or was used): verify the address again.
+        setVerification({ codeEmail: null, resendAt: 0, token: null, tokenEmail: null })
+        setStepIndex(0)
+        return
       }
+      if (error.code === 'email_taken') setRegisteredEmail(values.email.trim())
+      const paths = Object.keys(error.fieldErrors).map((field) => {
+        const path = formFieldPath(field)
+        form.setError(path as Path<RegistrationFormValues>, { type: 'server', message: error.fieldErrors[field] })
+        return path
+      })
       // Jump back to the first step that contains a field rejected by the server.
-      const target = steps.findIndex((s) => s.fields.some((f) => fields.includes(f)))
+      const target = steps.findIndex((s) => s.fields.some((f) => paths.some((p) => p === f || p.startsWith(`${f}.`))))
       if (target >= 0) setStepIndex(target)
     }
   })
 
-  if (result) return <RegistrationSuccess result={result} headingRef={headingRef} />
+  if (registered) return <RegistrationSuccess profile={registered} headingRef={headingRef} />
 
   return (
     <>
@@ -159,7 +258,9 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
       <div className="page-header">
         <div>
           <h1>Registrace oční kliniky</h1>
-          <p>Krok {stepIndex + 1} z {steps.length}: {step.title}</p>
+          <p>
+            Krok {stepIndex + 1} z {steps.length}: {step.title}
+          </p>
         </div>
         {plan && <span className="badge badge-info">Vybraná: {plan.name}</span>}
       </div>
@@ -189,9 +290,9 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
             <h2 ref={headingRef} tabIndex={-1} style={{ fontSize: '1.35rem', outline: 'none' }}>
               {step.title}
             </h2>
-            {submitError && (
-              <Alert kind="error" title="Registraci se nepodařilo odeslat">
-                {submitError}
+            {stepError && (
+              <Alert kind="error" title={step.key === 'summary' ? 'Registraci se nepodařilo odeslat' : 'Nelze pokračovat'}>
+                {stepError}
                 {registeredEmail && (
                   <>
                     {' '}
@@ -203,20 +304,50 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
               </Alert>
             )}
 
-            {step.key === 'plan' && <PlanStep plans={plans} />}
             {step.key === 'clinic' && <ClinicStep />}
-            {step.key === 'extra' && (
+            {step.key === 'verify' && (
+              <>
+                <EmailVerification
+                  email={form.getValues('email').trim()}
+                  verified={verified}
+                  resendAt={verification.resendAt}
+                  sending={sendingCode}
+                  notice={codeNotice}
+                  error={codeError}
+                  onError={setCodeError}
+                  onResend={async () => {
+                    if (await sendCode()) setCodeNotice('Poslali jsme nový kód. Platí jen ten nejnovější.')
+                  }}
+                  onVerified={(token) => {
+                    setCodeError(null)
+                    setCodeNotice(null)
+                    setVerification((v) => ({ ...v, token, tokenEmail: currentEmail }))
+                  }}
+                  onChangeEmail={() => goTo('clinic')}
+                />
+                <hr className="divider" />
+                <PlanStep plans={plans} />
+              </>
+            )}
+            {step.key === 'contacts' && (
               <div className="stack">
-                {plan?.fieldGroups.includes('operationalContact') && <OperationalContactFields />}
-                {plan?.fieldGroups.includes('serviceConfiguration') && (
+                <p className="muted" style={{ margin: 0 }}>
+                  Telefony, e-maily, web a další informace, které budou sloužit pacientům k objednání.
+                </p>
+                <PublicContactFields />
+                {plan && plan.fieldGroups.length > 0 && (
                   <>
                     <hr className="divider" />
-                    <ServiceConfigurationFields />
+                    <h3 className="section-title" style={{ marginBottom: 0 }}>
+                      Údaje podle úrovně ({plan.name})
+                    </h3>
+                    {plan.fieldGroups.includes('operationalContact') && <OperationalContactFields />}
+                    {plan.fieldGroups.includes('serviceConfiguration') && <ServiceConfigurationFields />}
                   </>
                 )}
               </div>
             )}
-            {step.key === 'summary' && <SummaryStep plan={plan} goTo={(key) => setStepIndex(steps.findIndex((s) => s.key === key))} />}
+            {step.key === 'summary' && <SummaryStep plan={plan} goTo={goTo} />}
           </div>
           <div className="dialog-footer" style={{ justifyContent: 'space-between' }}>
             <button type="button" className="btn" onClick={back} disabled={stepIndex === 0 || form.formState.isSubmitting}>
@@ -228,14 +359,178 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
                 Odeslat registraci
               </button>
             ) : (
-              <button type="submit" className="btn btn-dark">
-                Pokračovat <ArrowRight size={16} aria-hidden="true" />
+              <button type="submit" className="btn btn-dark" disabled={sendingCode}>
+                {sendingCode && step.key === 'clinic' ? <Spinner /> : null}
+                {step.key === 'clinic' && !verified ? 'Poslat ověřovací kód' : 'Pokračovat'} <ArrowRight size={16} aria-hidden="true" />
               </button>
             )}
           </div>
         </form>
       </FormProvider>
     </>
+  )
+}
+
+function ClinicStep() {
+  const {
+    register,
+    formState: { errors },
+  } = useFormContext<RegistrationFormValues>()
+  return (
+    <div className="stack">
+      <h3 className="section-title">Organizace</h3>
+      <div className="form-grid">
+        <Field label="Název kliniky" error={errors.name?.message} className="span-2" hint="Např. Oční klinika Plzeň">
+          {(a) => <input {...a} {...register('name')} className="input" autoComplete="organization" />}
+        </Field>
+        <Field label="IČO" error={errors.organizationId?.message} optional hint="8 číslic">
+          {(a) => <input {...a} {...register('organizationId')} className="input" inputMode="numeric" maxLength={10} />}
+        </Field>
+        <Field label="E-mail kontaktní osoby" error={errors.email?.message} hint="Slouží k přihlášení. Pošleme na něj ověřovací kód.">
+          {(a) => <input {...a} {...register('email')} className="input" type="email" autoComplete="email" />}
+        </Field>
+      </div>
+      <h3 className="section-title" style={{ marginTop: 32 }}>
+        Kontaktní osoba
+      </h3>
+      <ContactPersonFields />
+      <h3 className="section-title" style={{ marginTop: 32 }}>
+        Adresa kliniky
+      </h3>
+      <AddressFields />
+      <div className="alert alert-info" style={{ display: 'block', marginTop: 16 }}>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            {...register('authorityConfirmed')}
+            aria-invalid={Boolean(errors.authorityConfirmed)}
+            aria-describedby={errors.authorityConfirmed ? 'authority-error' : undefined}
+          />
+          <span>Potvrzuji, že jsem oprávněn(a) jednat jménem této organizace a registraci podávám za ni.</span>
+        </label>
+        {errors.authorityConfirmed && (
+          <p id="authority-error" className="field-error" style={{ marginTop: 8, marginBottom: 0 }}>
+            {errors.authorityConfirmed.message}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface EmailVerificationProps {
+  email: string
+  verified: boolean
+  resendAt: number
+  sending: boolean
+  notice: string | null
+  error: string | null
+  onError: (message: string | null) => void
+  onResend: () => Promise<void>
+  onVerified: (token: string) => void
+  onChangeEmail: () => void
+}
+
+/** Code (PIN) entry inside the wizard form: it has its own button, so Enter verifies instead of submitting the step. */
+function EmailVerification({ email, verified, resendAt, sending, notice, error, onError, onResend, onVerified, onChangeEmail }: EmailVerificationProps) {
+  const [code, setCode] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  const cooldown = Math.max(0, Math.ceil((resendAt - now) / 1000))
+
+  useEffect(() => {
+    if (verified || resendAt <= Date.now()) return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [resendAt, verified])
+
+  const verify = async () => {
+    const value = code.trim()
+    if (!/^\d{6}$/.test(value)) {
+      onError('Kód má 6 číslic.')
+      return
+    }
+    setChecking(true)
+    onError(null)
+    try {
+      const response = await publicApi.verifyRegistrationCode(email, value)
+      onVerified(response.verificationToken)
+    } catch (e) {
+      onError(e instanceof ApiError ? e.message : 'Ověření se nezdařilo.')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      void verify()
+    }
+  }
+
+  if (verified) {
+    return (
+      <section aria-labelledby="verify-title" className="verify-done">
+        <CircleCheck size={22} aria-hidden="true" />
+        <div>
+          <h3 id="verify-title" className="section-title" style={{ margin: 0 }}>
+            E-mail ověřen
+          </h3>
+          <p className="muted small" style={{ margin: 0 }}>
+            Adresa {email} patří vám. Zbývá zvolit úroveň registrace.
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section aria-labelledby="verify-title" className="stack">
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+        <span className="prereq-icon" aria-hidden="true">
+          <MailCheck size={22} />
+        </span>
+        <div>
+          <h3 id="verify-title" className="section-title" style={{ margin: 0 }}>
+            Ověření e-mailu
+          </h3>
+          <p className="muted" style={{ margin: 0 }}>
+            Na adresu <strong>{email}</strong> jsme poslali ověřovací kód (PIN). Zadejte jej níže.
+          </p>
+        </div>
+      </div>
+      {notice && <Alert kind="info">{notice}</Alert>}
+      <Field label="Ověřovací kód (PIN)" error={error ?? undefined} hint="6 číslic, platí 10 minut.">
+        {(a) => (
+          <input
+            {...a}
+            data-registration-code=""
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            onKeyDown={onKeyDown}
+            className="input input-code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="••••••"
+          />
+        )}
+      </Field>
+      <div className="inline-actions">
+        <button type="button" className="btn btn-primary" onClick={() => void verify()} disabled={checking}>
+          {checking ? <Spinner /> : <ShieldCheck size={18} aria-hidden="true" />}
+          Ověřit kód
+        </button>
+        <button type="button" className="btn-link" onClick={() => void onResend()} disabled={cooldown > 0 || sending}>
+          <RotateCw size={14} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 4 }} />
+          {sending ? 'Odesílám…' : cooldown > 0 ? `Poslat nový kód (${cooldown} s)` : 'Poslat nový kód'}
+        </button>
+        <button type="button" className="btn-link" onClick={onChangeEmail}>
+          Změnit e-mail
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -246,8 +541,13 @@ function PlanStep({ plans }: { plans: Plan[] }) {
   } = useFormContext<RegistrationFormValues>()
   return (
     <fieldset aria-describedby={errors.planCode ? 'plan-error' : undefined}>
-      <legend className="muted" style={{ marginBottom: 12 }}>
-        Úroveň určuje, jaké údaje budeme při registraci potřebovat. <Link to="/#plany">Porovnat úrovně</Link>
+      <legend style={{ marginBottom: 12 }}>
+        <h3 className="section-title" style={{ marginBottom: 4 }}>
+          Úroveň registrace
+        </h3>
+        <span className="muted small">
+          Úroveň určuje, jaké další údaje budeme potřebovat. <Link to="/#plany">Porovnat úrovně</Link>
+        </span>
       </legend>
       <div className="radio-cards">
         {plans.map((p) => (
@@ -276,37 +576,6 @@ function PlanStep({ plans }: { plans: Plan[] }) {
   )
 }
 
-function ClinicStep() {
-  const {
-    register,
-    formState: { errors },
-  } = useFormContext<RegistrationFormValues>()
-  return (
-    <div className="stack">
-      <h3 className="section-title">Klinika</h3>
-      <div className="form-grid">
-        <Field label="Název kliniky" error={errors.name?.message} className="span-2" hint="Např. Oční klinika Plzeň">
-          {(a) => <input {...a} {...register('name')} className="input" autoComplete="organization" />}
-        </Field>
-        <Field label="IČO" error={errors.organizationId?.message} optional hint="8 číslic">
-          {(a) => <input {...a} {...register('organizationId')} className="input" inputMode="numeric" maxLength={10} />}
-        </Field>
-        <Field label="E-mail pro přihlášení" error={errors.email?.message} hint="Pošleme na něj ověřovací kód.">
-          {(a) => <input {...a} {...register('email')} className="input" type="email" autoComplete="email" />}
-        </Field>
-      </div>
-      <h3 className="section-title" style={{ marginTop: 32 }}>
-        Kontaktní osoba
-      </h3>
-      <ContactPersonFields />
-      <h3 className="section-title" style={{ marginTop: 32 }}>
-        Adresa kliniky
-      </h3>
-      <AddressFields />
-    </div>
-  )
-}
-
 function SummaryStep({ plan, goTo }: { plan: Plan | undefined; goTo: (key: StepKey) => void }) {
   const {
     register,
@@ -319,32 +588,53 @@ function SummaryStep({ plan, goTo }: { plan: Plan | undefined; goTo: (key: StepK
       Upravit
     </button>
   )
+  const filled = (rows: { value: string }[]) => rows.map((row) => row.value.trim()).filter(Boolean)
+  const phones = filled(v.publicContacts.phones).map((phone) => formatPhone(phone.replace(/[\s-]/g, '')))
+  const emails = filled(v.publicContacts.emails)
 
   return (
     <div className="stack">
-      <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Úroveň registrace">
-        <div className="inline-actions" style={{ justifyContent: 'space-between' }}>
-          <h3 className="section-title" style={{ margin: 0 }}>Úroveň registrace</h3>
-          {editButton('plan', 'úroveň')}
-        </div>
-        <p style={{ margin: '8px 0 0' }}>
-          <strong>{plan?.name}</strong> – {plan?.tagline}
-        </p>
-      </section>
-
-      <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Klinika a kontakt">
+      <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Kontakt a organizace">
         <div className="inline-actions" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 className="section-title" style={{ margin: 0 }}>Klinika a kontakt</h3>
-          {editButton('clinic', 'klinika a kontakt')}
+          <h3 className="section-title" style={{ margin: 0 }}>Kontakt a organizace</h3>
+          {editButton('clinic', 'kontakt a organizace')}
         </div>
         <DefinitionList
           items={[
             ['Název', v.name],
             ['IČO', v.organizationId || '—'],
-            ['E-mail', v.email],
             ['Kontaktní osoba', `${v.contactFirstName} ${v.contactLastName}`],
             ['Telefon', formatPhone(v.phone.replace(/[\s-]/g, ''))],
             ['Adresa', `${v.street}, ${formatPostalCode(v.postalCode)} ${v.city}`],
+            ['Oprávnění jednat', 'Potvrzeno'],
+          ]}
+        />
+      </section>
+
+      <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Ověření e-mailu a úroveň">
+        <div className="inline-actions" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 className="section-title" style={{ margin: 0 }}>Ověření e-mailu a úroveň</h3>
+          {editButton('verify', 'úroveň')}
+        </div>
+        <DefinitionList
+          items={[
+            ['E-mail', `${v.email.trim()} (ověřen)`],
+            ['Úroveň registrace', plan ? `${plan.name} – ${plan.tagline}` : '—'],
+          ]}
+        />
+      </section>
+
+      <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Veřejné kontakty">
+        <div className="inline-actions" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 className="section-title" style={{ margin: 0 }}>Veřejné kontakty</h3>
+          {editButton('contacts', 'veřejné kontakty')}
+        </div>
+        <DefinitionList
+          items={[
+            ['Telefon', phones.length > 0 ? phones.join(', ') : '—'],
+            ['E-mail', emails.length > 0 ? emails.join(', ') : '—'],
+            ['Web', v.website.trim() || '—'],
+            ['Další informace', v.patientInfo.trim() || '—'],
           ]}
         />
       </section>
@@ -353,7 +643,7 @@ function SummaryStep({ plan, goTo }: { plan: Plan | undefined; goTo: (key: StepK
         <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Údaje podle úrovně">
           <div className="inline-actions" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
             <h3 className="section-title" style={{ margin: 0 }}>Údaje podle úrovně</h3>
-            {editButton('extra', 'údaje podle úrovně')}
+            {editButton('contacts', 'údaje podle úrovně')}
           </div>
           <DefinitionList
             items={[
@@ -408,44 +698,36 @@ function SummaryStep({ plan, goTo }: { plan: Plan | undefined; goTo: (key: StepK
   )
 }
 
-function RegistrationSuccess({ result, headingRef }: { result: RegistrationResponse; headingRef: RefObject<HTMLHeadingElement | null> }) {
-  const session = useClinicSession()
+function RegistrationSuccess({ profile, headingRef }: { profile: ClinicProfile; headingRef: RefObject<HTMLHeadingElement | null> }) {
   const navigate = useNavigate()
-  const toast = useToast()
-
   return (
     <div className="card">
       <div className="card-body stack">
-        <Alert kind="success" title="Registrace byla uložena">
-          Vaše registrace nyní čeká na posouzení administrátorem. Nejprve prosím ověřte svůj e-mail.
-        </Alert>
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          <span className="prereq-icon" aria-hidden="true">
-            <MailCheck size={22} />
+          <span className="prereq-icon prereq-icon-success" aria-hidden="true">
+            <CircleCheck size={22} />
           </span>
           <div>
             <h1 ref={headingRef} tabIndex={-1} style={{ fontSize: '1.6rem', outline: 'none' }}>
-              Ověřte e-mail
+              Registrace byla odeslána
             </h1>
             <p className="muted" style={{ margin: 0 }}>
-              {result.verificationEmailSent
-                ? `Na adresu ${result.email} jsme poslali jednorázový kód. Zadejte jej níže.`
-                : `Registraci jsme uložili, ale e-mail s kódem se nyní nepodařilo odeslat na ${result.email}.`}
+              Registrace kliniky {profile.name} ({profile.plan.name}) nyní čeká na posouzení administrátorem.
             </p>
           </div>
         </div>
-        <CodeVerification
-          email={result.email}
-          initialDeliveryFailed={!result.verificationEmailSent}
-          onVerified={(profile) => {
-            session.setData(profile)
-            toast.show('E-mail byl ověřen. Vítejte v portálu kliniky.')
-            navigate('/portal', { replace: true })
-          }}
-        />
-        <p className="small muted" style={{ marginBottom: 0 }}>
-          Kód můžete zadat i později – stačí se přihlásit na stránce <Link to="/prihlaseni">Přihlášení kliniky</Link>.
-        </p>
+        <Alert kind="success" title="Potvrzení je na cestě">
+          Na adresu {profile.email} jsme poslali potvrzení s PDF přehledem vyplněných údajů. O výsledku posouzení vás budeme
+          informovat e-mailem.
+        </Alert>
+        <div className="inline-actions">
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/portal', { replace: true })}>
+            Přejít do portálu kliniky <ArrowRight size={16} aria-hidden="true" />
+          </button>
+          <a className="btn" href={clinicApi.confirmationUrl} download>
+            <Download size={16} aria-hidden="true" /> Stáhnout PDF přehled
+          </a>
+        </div>
       </div>
     </div>
   )
