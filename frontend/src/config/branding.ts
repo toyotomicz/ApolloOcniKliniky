@@ -7,5 +7,5 @@ export const branding = {
   appName: 'ApolloData',
   appSubtitle: 'Oční kliniky',
   disclaimer:
-    'Demonstrační aplikace vytvořená jako technické zadání. Názvy a obsah plánů jsou provizorní a nepředstavují skutečnou obchodní nabídku.',
+    'Demonstrační aplikace vytvořená jako technické zadání. Obsah úrovní registrace je provizorní a nepředstavují skutečnou obchodní nabídku.',
 } as const

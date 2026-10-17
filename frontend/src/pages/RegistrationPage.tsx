@@ -43,13 +43,13 @@ export function buildSteps(plan: Plan | undefined): Step[] {
     ...(plan?.fieldGroups.includes('serviceConfiguration') ? serviceFields : []),
   ]
   return [
-    { key: 'plan', title: 'Plán', fields: ['planCode'] },
+    { key: 'plan', title: 'Úroveň', fields: ['planCode'] },
     {
       key: 'clinic',
       title: 'Klinika a kontakt',
       fields: ['name', 'organizationId', 'email', 'contactFirstName', 'contactLastName', 'phone', 'street', 'city', 'postalCode'],
     },
-    ...(extraFields.length > 0 ? [{ key: 'extra' as const, title: 'Údaje podle plánu', fields: extraFields }] : []),
+    ...(extraFields.length > 0 ? [{ key: 'extra' as const, title: 'Údaje podle úrovně', fields: extraFields }] : []),
     { key: 'summary', title: 'Souhrn a odeslání', fields: ['privacyNoticeAccepted'] },
   ]
 }
@@ -154,7 +154,7 @@ function RegistrationWizard({ plans, initialPlanCode }: { plans: Plan[]; initial
   return (
     <>
       <Link to="/#plany" className="back-link">
-        <ArrowLeft size={16} aria-hidden="true" /> Zpět na plány
+        <ArrowLeft size={16} aria-hidden="true" /> Zpět na úrovně registrace
       </Link>
       <div className="page-header">
         <div>
@@ -247,7 +247,7 @@ function PlanStep({ plans }: { plans: Plan[] }) {
   return (
     <fieldset aria-describedby={errors.planCode ? 'plan-error' : undefined}>
       <legend className="muted" style={{ marginBottom: 12 }}>
-        Plán určuje, jaké údaje budeme při registraci potřebovat. <Link to="/#plany">Porovnat plány</Link>
+        Úroveň určuje, jaké údaje budeme při registraci potřebovat. <Link to="/#plany">Porovnat úrovně</Link>
       </legend>
       <div className="radio-cards">
         {plans.map((p) => (
@@ -260,9 +260,8 @@ function PlanStep({ plans }: { plans: Plan[] }) {
                   {p.badge}
                 </span>
               )}
-              <br />
-              <span>{p.tagline}</span>
-              <br />
+              <span className="radio-card-tagline">{p.tagline}</span>
+              <span className="radio-card-price">{p.description}</span>
               <span className="small muted">{planRequirementText(p)}</span>
             </span>
           </label>
@@ -323,10 +322,10 @@ function SummaryStep({ plan, goTo }: { plan: Plan | undefined; goTo: (key: StepK
 
   return (
     <div className="stack">
-      <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Plán">
+      <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Úroveň registrace">
         <div className="inline-actions" style={{ justifyContent: 'space-between' }}>
-          <h3 className="section-title" style={{ margin: 0 }}>Plán</h3>
-          {editButton('plan', 'plán')}
+          <h3 className="section-title" style={{ margin: 0 }}>Úroveň registrace</h3>
+          {editButton('plan', 'úroveň')}
         </div>
         <p style={{ margin: '8px 0 0' }}>
           <strong>{plan?.name}</strong> – {plan?.tagline}
@@ -351,10 +350,10 @@ function SummaryStep({ plan, goTo }: { plan: Plan | undefined; goTo: (key: StepK
       </section>
 
       {plan && plan.fieldGroups.length > 0 && (
-        <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Údaje podle plánu">
+        <section className="card card-body" style={{ boxShadow: 'none' }} aria-label="Údaje podle úrovně">
           <div className="inline-actions" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 className="section-title" style={{ margin: 0 }}>Údaje podle plánu</h3>
-            {editButton('extra', 'údaje podle plánu')}
+            <h3 className="section-title" style={{ margin: 0 }}>Údaje podle úrovně</h3>
+            {editButton('extra', 'údaje podle úrovně')}
           </div>
           <DefinitionList
             items={[

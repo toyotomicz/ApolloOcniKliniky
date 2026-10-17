@@ -86,7 +86,7 @@ const contactShape = (plan: Plan | undefined) => ({
 
 export function registrationSchema(plan: Plan | undefined) {
   return z.object({
-    planCode: z.string().min(1, 'Vyberte jeden z nabízených plánů.'),
+    planCode: z.string().min(1, 'Vyberte jednu z úrovní registrace.'),
     name: required(200, 2),
     organizationId,
     email: email(),

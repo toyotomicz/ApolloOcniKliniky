@@ -17,7 +17,7 @@ export function PrivacyPage() {
           <h2 style={{ fontSize: '1.3rem' }}>Jaké údaje zpracováváme</h2>
           <p>
             Identifikační a kontaktní údaje kliniky (název, IČO, adresa), jméno, e-mail a telefon kontaktní osoby,
-            případně provozního a technického kontaktu, a údaje o zvoleném plánu. Portál nezpracovává žádné údaje
+            případně provozního a technického kontaktu, a údaje o zvolené úrovni registrace. Portál nezpracovává žádné údaje
             o pacientech ani zdravotní dokumentaci.
           </p>
         </section>

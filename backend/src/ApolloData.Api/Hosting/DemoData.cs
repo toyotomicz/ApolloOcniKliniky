@@ -70,13 +70,13 @@ public sealed class DemoDataSeeder(AppDbContext db, TimeProvider time)
     [
         "Telefonicky ověřeno s vedoucí lékařkou, údaje sedí.",
         "Oprávnění k poskytování zdravotních služeb doloženo e-mailem.",
-        "Klinika plánuje rozšíření o druhé pracoviště – zvážit plán Premium.",
+        "Klinika plánuje rozšíření o druhé pracoviště – zvážit úroveň 3.",
         "Kontaktní osoba je k zastižení jen dopoledne.",
     ];
 
     private static readonly (string Clinic, string? Admin)[] Conversations =
     [
-        ("Dobrý den, můžeme v registraci později změnit plán na Premium?", "Dobrý den, ano – stačí nám napsat a plán upravíme."),
+        ("Dobrý den, můžeme později přejít na úroveň 3?", "Dobrý den, ano – stačí nám napsat a úroveň upravíme."),
         ("Posíláme doplněné oprávnění, prosíme o kontrolu.", "Děkujeme, oprávnění máme, registraci posoudíme do dvou dnů."),
         ("Kdy můžeme očekávat výsledek posouzení?", null),
         ("Změnila se nám kontaktní osoba, údaje jsme upravili v portálu.", "Díky, změnu vidíme."),

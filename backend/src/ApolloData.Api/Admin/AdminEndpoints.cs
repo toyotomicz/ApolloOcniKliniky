@@ -107,7 +107,7 @@ public static class AdminEndpoints
         if (!string.IsNullOrWhiteSpace(planInput))
         {
             plan = PlanCatalog.Find(planInput)?.Code;
-            if (plan is null) errors.Add("plan", "Neznámý plán.");
+            if (plan is null) errors.Add("plan", "Neznámá úroveň registrace.");
         }
         var search = searchInput?.Trim();
         if (search is { Length: > 100 }) errors.Add("search", "Hledaný výraz je příliš dlouhý.");

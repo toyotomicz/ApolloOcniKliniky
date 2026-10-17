@@ -10,6 +10,7 @@ import { useClinicSession } from '../auth/sessions'
 import { AddressFields, ContactPersonFields, OperationalContactFields, ServiceConfigurationFields } from '../components/ClinicFormFields'
 import { useToast } from '../components/Toast'
 import { Alert, DefinitionList, LoadingBlock, Spinner } from '../components/ui'
+import { formatPhone } from '../lib/format'
 import { usePlans } from '../lib/usePlans'
 import { profileSchema, toProfilePayload, type ContactFormValues } from '../lib/validation'
 
@@ -17,14 +18,14 @@ function toFormValues(clinic: ClinicProfile): ContactFormValues {
   return {
     contactFirstName: clinic.contactFirstName,
     contactLastName: clinic.contactLastName,
-    phone: clinic.phone,
+    phone: formatPhone(clinic.phone),
     street: clinic.street,
     city: clinic.city,
     postalCode: clinic.postalCode,
     operationalContact: {
       name: clinic.operationalContact?.name ?? '',
       email: clinic.operationalContact?.email ?? '',
-      phone: clinic.operationalContact?.phone ?? '',
+      phone: clinic.operationalContact?.phone ? formatPhone(clinic.operationalContact.phone) : '',
     },
     serviceConfiguration: {
       workplaceCount: clinic.serviceConfiguration ? String(clinic.serviceConfiguration.workplaceCount) : '',

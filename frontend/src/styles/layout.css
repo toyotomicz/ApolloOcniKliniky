@@ -81,6 +81,9 @@
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
 }
+.site-nav a.active:not(.btn) {
+  background: rgba(255, 255, 255, 0.14);
+}
 .site-nav .btn {
   margin-left: var(--space-3);
 }
@@ -277,6 +280,21 @@
   .portal-grid {
     grid-template-columns: 1fr;
   }
+  /* Admin clinic detail: the decision panel comes first, the remaining admin cards after the details. */
+  .detail-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .detail-grid > aside {
+    display: contents;
+  }
+  .detail-grid > aside > * {
+    margin-top: 0;
+  }
+  .detail-grid .decision-panel {
+    order: -1;
+  }
 }
 
 .status-panel {
@@ -449,21 +467,50 @@
   --btn-bg: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
-@media (max-width: 760px) {
+/* Medium widths: the section links move to their own row instead of being cut off. */
+@media (max-width: 1100px) {
   .admin-topbar-inner {
     flex-wrap: wrap;
-    gap: var(--space-2) var(--space-3);
-    padding-block: var(--space-2);
+    gap: 0 var(--space-3);
+    padding-top: var(--space-2);
   }
   .admin-nav {
     order: 3;
     flex-basis: 100%;
+    margin-inline: -12px;
+    padding-bottom: var(--space-2);
   }
   .admin-user {
     margin-left: auto;
   }
+}
+/* Phones: a compact tab bar – icon above a short label, all five sections visible. */
+@media (max-width: 760px) {
   .admin-user-name {
     display: none;
+  }
+  .admin-nav {
+    margin-inline: 0;
+    margin-top: var(--space-2);
+    gap: 2px;
+  }
+  .admin-nav a {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 2px;
+    font-size: 0.72rem;
+    letter-spacing: 0;
+    text-transform: none;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .admin-nav a svg {
+    width: 18px;
+    height: 18px;
   }
 }
 

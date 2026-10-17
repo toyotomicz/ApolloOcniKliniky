@@ -16,7 +16,7 @@ export function usePlans() {
       cache = await publicApi.plans()
       setPlans(cache)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Plány se nepodařilo načíst.')
+      setError(e instanceof ApiError ? e.message : 'Úrovně registrace se nepodařilo načíst.')
     }
   }, [])
 

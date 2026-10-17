@@ -47,7 +47,7 @@ public static class ConfirmationPdf
             ("Kontaktní osoba", $"{clinic.ContactFirstName} {clinic.ContactLastName}"),
             ("E-mail", clinic.Email),
             ("Telefon", FormatPhone(clinic.Phone)),
-            ("Plán", plan is null ? clinic.PlanCode : $"{plan.Name} – {plan.Tagline}"),
+            ("Úroveň registrace", plan is null ? clinic.PlanCode : $"{plan.Name} – {plan.Tagline}"),
         };
         if (clinic.OperationalContact is { } oc)
         {

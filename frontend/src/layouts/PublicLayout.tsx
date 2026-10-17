@@ -1,6 +1,6 @@
 import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { Brand } from '../components/Brand'
 import { branding } from '../config/branding'
 
@@ -35,7 +35,7 @@ export function SiteHeader() {
         >
           <Link to="/#postup">Jak to funguje</Link>
           <Link to="/#plany">Úrovně</Link>
-          <Link to="/prihlaseni">Přihlášení</Link>
+          <NavLink to="/prihlaseni">Přihlášení</NavLink>
           <Link to="/registrace" className="btn btn-primary">
             Registrovat kliniku
           </Link>

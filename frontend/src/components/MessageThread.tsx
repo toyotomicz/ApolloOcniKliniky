@@ -58,7 +58,7 @@ export function MessageThread({ viewer, messages, loading, error, onSend, onSent
     <div className="thread">
       {error && <Alert kind="error">{error}</Alert>}
       {loading && !messages && <Spinner label="Načítám zprávy…" />}
-      {messages && messages.length === 0 && <EmptyState title="Zatím žádné zprávy" icon={<MessageSquare size={28} aria-hidden="true" />}><p style={{ margin: 0 }}>{emptyText}</p></EmptyState>}
+      {messages && messages.length === 0 && <EmptyState compact title="Zatím žádné zprávy" icon={<MessageSquare size={24} aria-hidden="true" />}><p style={{ margin: 0 }}>{emptyText}</p></EmptyState>}
       {messages && messages.length > 0 && (
         <ol className="thread-list" ref={listRef} aria-label="Zprávy">
           {messages.map((m) => {

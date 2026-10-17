@@ -19,7 +19,7 @@ const sortOptions = [
   { value: 'name:asc', label: 'Název A–Z' },
   { value: 'name:desc', label: 'Název Z–A' },
   { value: 'status:asc', label: 'Podle stavu' },
-  { value: 'plan:asc', label: 'Podle plánu' },
+  { value: 'plan:asc', label: 'Podle úrovně' },
 ]
 
 const bulkActions: { status: ClinicStatus; icon: typeof CircleCheck; button: string; variant: 'success' | 'danger-solid' | 'dark' }[] = [
@@ -192,10 +192,10 @@ export function AdminClinicsPage() {
           </div>
           <div>
             <label htmlFor="filter-plan" className="visually-hidden">
-              Plán
+              Úroveň registrace
             </label>
             <select id="filter-plan" className="select" value={plan} onChange={(e) => update({ plan: e.target.value })}>
-              <option value="">Všechny plány</option>
+              <option value="">Všechny úrovně</option>
               {plans?.map((p) => (
                 <option key={p.code} value={p.code}>
                   {p.name}
@@ -291,7 +291,7 @@ export function AdminClinicsPage() {
                     </th>
                     <th scope="col">Klinika</th>
                     <th scope="col">IČO</th>
-                    <th scope="col">Plán</th>
+                    <th scope="col">Úroveň</th>
                     <th scope="col">Stav</th>
                     <th scope="col">Zprávy</th>
                     <th scope="col">Registrováno</th>
@@ -303,7 +303,7 @@ export function AdminClinicsPage() {
                       <td className="col-select" data-label="Vybrat">
                         <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} aria-label={`Vybrat ${c.name}`} />
                       </td>
-                      <td data-label="Klinika">
+                      <td data-label="Klinika" className="td-main">
                         <Link to={`/admin/kliniky/${c.id}`}>{c.name}</Link>
                         <div className="small muted">
                           {c.email} · {c.city}
@@ -313,8 +313,8 @@ export function AdminClinicsPage() {
                       <td data-label="IČO" className="mono">
                         {c.organizationId ?? '—'}
                       </td>
-                      <td data-label="Plán">{planName(c.planCode)}</td>
-                      <td data-label="Stav">
+                      <td data-label="Úroveň" className="nowrap">{planName(c.planCode)}</td>
+                      <td data-label="Stav" className="nowrap">
                         <StatusBadge status={c.status} />
                       </td>
                       <td data-label="Zprávy">
@@ -326,7 +326,7 @@ export function AdminClinicsPage() {
                           <span className="muted">—</span>
                         )}
                       </td>
-                      <td data-label="Registrováno">{formatDateTime(c.createdAt)}</td>
+                      <td data-label="Registrováno" className="nowrap">{formatDateTime(c.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
